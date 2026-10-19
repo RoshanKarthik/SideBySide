@@ -1,0 +1,31 @@
+{
+  "name": "sidebyside",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.7",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @sidebyside/db generate",
+    "db:migrate": "pnpm --filter @sidebyside/db migrate",
+    "deploy": "pnpm build && pnpm --filter @sidebyside/server deploy"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "turbo": "2.11.9",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "8.72.0"
+  }
+}

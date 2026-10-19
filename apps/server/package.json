@@ -1,0 +1,32 @@
+{
+  "name": "@sidebyside/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types --strict-vars=false"
+  },
+  "dependencies": {
+    "@sidebyside/db": "workspace:*",
+    "@sidebyside/shared": "workspace:*",
+    "better-auth": "^1.7.11",
+    "hono": "^4.13.13",
+    "lib0": "^0.2.119",
+    "partyserver": "^0.5.10",
+    "pg": "^8.23.1",
+    "y-partyserver": "^2.2.0",
+    "yjs": "^13.6.33",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.151.2"
+  }
+}

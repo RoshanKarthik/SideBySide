@@ -1,0 +1,244 @@
+import {
+  LANGUAGES,
+  ROOM_MODES,
+  ROOM_ROLES,
+  ROOM_STATUSES,
+  RUN_STATUSES,
+  VISIBILITIES,
+} from '@sidebyside/shared';
+import { sql } from 'drizzle-orm';
+import {
+  bigserial,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+
+const id = () =>
+  uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`);
+const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
+const updatedAt = () =>
+  timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date());
+
+export const languageEnum = pgEnum('language', LANGUAGES);
+export const roomModeEnum = pgEnum('room_mode', ROOM_MODES);
+export const roomStatusEnum = pgEnum('room_status', ROOM_STATUSES);
+export const roomRoleEnum = pgEnum('room_role', ROOM_ROLES);
+export const visibilityEnum = pgEnum('visibility', VISIBILITIES);
+export const runKindEnum = pgEnum('run_kind', ['run', 'tests']);
+export const runStatusEnum = pgEnum('run_status', RUN_STATUSES);
+
+// ---------------------------------------------------------------------------
+// Auth (managed by Better Auth; property names are the ones Better Auth expects)
+// ---------------------------------------------------------------------------
+
+export const users = pgTable('users', {
+  id: id(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  name: text('display_name').notNull(),
+  image: text('avatar_url'),
+  defaultLanguage: languageEnum('default_language').notNull().default('python'),
+  lowBandwidth: boolean('low_bandwidth').notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    token: text('token').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('sessions_user_idx').on(t.userId)],
+);
+
+export const accounts = pgTable(
+  'accounts',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    accountId: text('account_id').notNull(),
+    providerId: text('provider_id').notNull(),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    idToken: text('id_token'),
+    accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+    refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
+    scope: text('scope'),
+    password: text('password'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('accounts_user_idx').on(t.userId)],
+);
+
+export const verifications = pgTable(
+  'verifications',
+  {
+    id: id(),
+    identifier: text('identifier').notNull(),
+    value: text('value').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('verifications_identifier_idx').on(t.identifier)],
+);
+
+// ---------------------------------------------------------------------------
+// Rooms
+// ---------------------------------------------------------------------------
+
+export const rooms = pgTable(
+  'rooms',
+  {
+    id: id(),
+    slug: text('slug').notNull().unique(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    mode: roomModeEnum('mode').notNull().default('interview'),
+    title: text('title').notNull(),
+    status: roomStatusEnum('status').notNull().default('scheduled'),
+    defaultLanguage: languageEnum('default_language').notNull().default('python'),
+    shareReplayWithCandidate: boolean('share_replay_with_candidate').notNull().default(false),
+    shareReportWithCandidate: boolean('share_report_with_candidate').notNull().default(false),
+    retentionDays: integer('retention_days').notNull().default(30),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    deleteAfter: timestamp('delete_after', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('rooms_owner_idx').on(t.ownerId),
+    index('rooms_delete_after_idx').on(t.deleteAfter),
+  ],
+);
+
+export const participants = pgTable(
+  'participants',
+  {
+    id: id(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    /** Null for guest candidates. */
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    displayName: text('display_name').notNull(),
+    role: roomRoleEnum('role').notNull(),
+    consentAcceptedAt: timestamp('consent_accepted_at', { withTimezone: true }),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    leftAt: timestamp('left_at', { withTimezone: true }),
+    claimToken: text('claim_token'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('participants_room_idx').on(t.roomId),
+    uniqueIndex('participants_room_user_idx')
+      .on(t.roomId, t.userId)
+      .where(sql`${t.userId} is not null`),
+  ],
+);
+
+export const sessionRounds = pgTable(
+  'session_rounds',
+  {
+    id: id(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    roundNumber: integer('round_number').notNull(),
+    interviewerParticipantId: uuid('interviewer_participant_id').references(() => participants.id, {
+      onDelete: 'set null',
+    }),
+    candidateParticipantId: uuid('candidate_participant_id').references(() => participants.id, {
+      onDelete: 'set null',
+    }),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('session_rounds_room_round_idx').on(t.roomId, t.roundNumber)],
+);
+
+// ---------------------------------------------------------------------------
+// Event log (Yjs updates and snapshots live in each room's Durable Object storage)
+// ---------------------------------------------------------------------------
+
+export const events = pgTable(
+  'events',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    roundNumber: integer('round_number').notNull().default(1),
+    participantId: uuid('participant_id').references(() => participants.id, {
+      onDelete: 'set null',
+    }),
+    type: text('type').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
+    visibility: visibilityEnum('visibility').notNull().default('all'),
+    serverTs: timestamp('server_ts', { withTimezone: true, precision: 3 }).notNull(),
+  },
+  (t) => [index('events_room_ts_idx').on(t.roomId, t.serverTs)],
+);
+
+export const codeRuns = pgTable(
+  'code_runs',
+  {
+    id: id(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    participantId: uuid('participant_id').references(() => participants.id, {
+      onDelete: 'set null',
+    }),
+    language: languageEnum('language').notNull(),
+    sourceCode: text('source_code').notNull(),
+    stdin: text('stdin').notNull().default(''),
+    kind: runKindEnum('kind').notNull().default('run'),
+    questionId: uuid('question_id'),
+    status: runStatusEnum('status').notNull(),
+    stdout: text('stdout').notNull().default(''),
+    stderr: text('stderr').notNull().default(''),
+    compileOutput: text('compile_output'),
+    exitCode: integer('exit_code'),
+    timeMs: integer('time_ms'),
+    memoryKb: integer('memory_kb'),
+    testsPassed: integer('tests_passed'),
+    testsTotal: integer('tests_total'),
+    details: jsonb('details'),
+    serverTs: timestamp('server_ts', { withTimezone: true, precision: 3 }).notNull(),
+  },
+  (t) => [index('code_runs_room_ts_idx').on(t.roomId, t.serverTs)],
+);
+
+export type UserRow = typeof users.$inferSelect;
+export type RoomRow = typeof rooms.$inferSelect;
+export type ParticipantRow = typeof participants.$inferSelect;
+export type EventRow = typeof events.$inferSelect;
+export type CodeRunRow = typeof codeRuns.$inferSelect;

@@ -1,0 +1,23 @@
+{
+  "name": "@sidebyside/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./doc": "./src/doc.ts",
+    "./replay": "./src/replay.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "lib0": "^0.2.119",
+    "yjs": "^13.6.33",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.12"
+  }
+}
