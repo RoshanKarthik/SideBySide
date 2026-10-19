@@ -10,7 +10,7 @@
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/collab/*"],
+    "run_worker_first": ["/api/*", "/collab/*", "/assets/runner.worker-*"],
   },
   "durable_objects": {
     "bindings": [{ "name": "Room", "class_name": "Room" }],
@@ -30,4 +30,5 @@
     "ALLOW_DEV_LOGIN": "false",
   },
   "observability": { "enabled": true },
+  "send_metrics": false,
 }

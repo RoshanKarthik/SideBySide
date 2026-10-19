@@ -18,6 +18,26 @@ const deps: AppDeps = {
 
 const api = createApp(deps);
 
+/**
+ * The code runner executes other people's code, so its worker script gets a policy that only
+ * lets it load Pyodide from our origin: no API calls, no other network access.
+ */
+async function serveRunnerWorker(request: Request, env: Env): Promise<Response> {
+  const asset = await env.ASSETS.fetch(request);
+  const response = new Response(asset.body, asset);
+  const origin = new URL(request.url).origin;
+  response.headers.set(
+    'content-security-policy',
+    [
+      "default-src 'none'",
+      "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'",
+      `connect-src ${origin}/pyodide/`,
+      "worker-src 'none'",
+    ].join('; '),
+  );
+  return response;
+}
+
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const { pathname } = new URL(request.url);
@@ -31,6 +51,7 @@ export default {
       });
       return response ?? new Response('Not found', { status: 404 });
     }
+    if (pathname.startsWith('/assets/runner.worker-')) return serveRunnerWorker(request, env);
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;

@@ -7,5 +7,5 @@ GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 # Enables email + password sign-in for local testing only. Keep false in production.
 ALLOW_DEV_LOGIN=true
-# Lets a second browser profile use 127.0.0.1 (separate cookies) to test guest joins.
-TRUSTED_ORIGINS=http://127.0.0.1:5173
+# Extra local hostnames (separate cookies) for testing a guest join next to a signed-in tab.
+TRUSTED_ORIGINS=http://127.0.0.1:5173,http://guest.localhost:5173

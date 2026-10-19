@@ -12,6 +12,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/worker-configuration.d.ts',
       'packages/db/migrations/**',
+      'apps/web/public/pyodide/**',
     ],
   },
   js.configs.recommended,

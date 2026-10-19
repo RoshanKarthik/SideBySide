@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { Database, DbHandle } from './index';
 import * as schema from './schema';
 
-const migrationsFolder = fileURLToPath(new URL('../migrations', import.meta.url));
+const migrationsFolder = fileURLToPath(new URL('../migrations', import.meta.url).href);
 
 /** An in-memory Postgres (PGlite) with all migrations applied, for tests. */
 export async function createTestDb(): Promise<DbHandle> {
