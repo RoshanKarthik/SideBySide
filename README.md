@@ -8,7 +8,14 @@ edit is recorded with a server timestamp, so the whole session can be **replayed
 - Candidates open the link, enter their name, accept the recording notice and join. No account.
 - Notes and code sync live, with everyone's cursors and presence.
 - Python, JavaScript and TypeScript run in the browser in a sandboxed WebAssembly worker.
-- When the interviewer ends the session, the replay is available with a marker for every code run.
+- A shared whiteboard (Design tab) with live pointers and starter templates.
+- Interviewers keep a question bank (their own questions plus a public practice bank) with
+  starter code, hints and test cases. **Show to candidate** loads the problem and starter code;
+  **Run tests** reports pass/fail, and candidates never see the contents of hidden tests.
+- A private interviewer panel: private notes with one-click timestamps, a rubric, a timer, an
+  editor lock and a co-interviewer invite link.
+- When the interviewer ends the session, the replay (notes, code and whiteboard) is available
+  with a marker for every code run.
 
 ## Stack
 
@@ -21,6 +28,7 @@ edit is recorded with a server timestamp, so the whole session can be **replayed
 | API            | Hono + zod                                                                  |
 | Web            | React 19, Vite, React Router, TanStack Query, Tailwind CSS 4, Radix UI      |
 | Editors        | Monaco + `y-monaco` (code), TipTap + Yjs (notes)                            |
+| Whiteboard     | Excalidraw, synced through the room's Yjs document                          |
 | Code execution | Pyodide (Python) and a JS/TS runner in a locked-down Web Worker             |
 | Tooling        | TypeScript (strict), pnpm workspaces, Turborepo, Vitest, ESLint, Prettier   |
 
@@ -40,14 +48,22 @@ packages/
 
 ### Where data lives
 
-- **Postgres (Neon):** users and sessions, rooms, participants, rounds, events, code runs.
-- **Each room's Durable Object (SQLite):** the live Yjs document, every update with its server
-  timestamp, and a snapshot every minute. Replay reads from here.
+- **Postgres (Neon):** users and sessions, rooms, participants, rounds, events, code runs,
+  questions and test cases, rubric scores.
+- **Each room's Durable Objects (SQLite):** the live shared Yjs document (notes, code,
+  whiteboard), every update with its server timestamp, and a snapshot every minute. Replay reads
+  from here. Interviewer-only data (private notes, rubric, timer) lives in a second document
+  that candidates can't connect to.
 
 ## Local development
 
-Prerequisites: Node.js 22+, pnpm 10 (`npm i -g pnpm@10`), and a free [Neon](https://neon.tech)
-project. Use a separate Neon branch (for example `dev`) for development.
+Prerequisites: Node.js 22+, pnpm 10 (`npm i -g pnpm@10`), and a Postgres database: either a
+free [Neon](https://neon.tech) project (use a separate branch, for example `dev`) or a local
+Postgres, for example in Docker:
+
+```bash
+docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=sbs -e POSTGRES_DB=sidebyside -p 55432:5432 postgres:17-alpine
+```
 
 1. Install dependencies:
 
@@ -55,8 +71,10 @@ project. Use a separate Neon branch (for example `dev`) for development.
    pnpm install
    ```
 
-2. Create `.env` in the repository root from `.env.example`, using your Neon dev branch's
-   **direct** connection string for both values.
+2. Create `.env` in the repository root from `.env.example`, using your database's **direct**
+   connection string for both values. For the local Docker database that is
+   `postgresql://sbs:sbs@127.0.0.1:55432/sidebyside`, with `?sslmode=disable` added to the
+   second (Hyperdrive) value.
 
 3. Create `apps/server/.dev.vars` from `apps/server/.dev.vars.example`. Generate the two secrets
    with:
@@ -68,10 +86,11 @@ project. Use a separate Neon branch (for example `dev`) for development.
    With `ALLOW_DEV_LOGIN=true` you can sign in with email and password locally, so OAuth apps are
    optional for development.
 
-4. Create the tables:
+4. Create the tables and load the public question bank:
 
    ```bash
    pnpm db:migrate
+   pnpm db:seed
    ```
 
 5. Start the Worker (port 8787) and the web app (port 5173):
@@ -81,7 +100,9 @@ project. Use a separate Neon branch (for example `dev`) for development.
    ```
 
    Open http://localhost:5173. To try a guest join next to a signed-in tab, open the room link
-   on http://guest.localhost:5173 (a different hostname, so it has its own cookies).
+   on http://guest.localhost:5173 (a different hostname, so it has its own cookies). For a
+   second signed-in user (for example a co-interviewer), add another `*.localhost` origin to
+   `TRUSTED_ORIGINS` in `.dev.vars` and use that hostname.
 
 ### Useful scripts
 
@@ -93,6 +114,7 @@ project. Use a separate Neon branch (for example `dev`) for development.
 | `pnpm lint`        | ESLint                                             |
 | `pnpm db:generate` | New SQL migration from `packages/db/src/schema.ts` |
 | `pnpm db:migrate`  | Apply migrations to `DATABASE_URL`                 |
+| `pnpm db:seed`     | Load (or refresh) the public question bank         |
 
 ## Deploying
 
@@ -101,6 +123,7 @@ project. Use a separate Neon branch (for example `dev`) for development.
 
    ```bash
    DATABASE_URL="postgresql://…" pnpm db:migrate
+   DATABASE_URL="postgresql://…" pnpm db:seed
    ```
 
 2. **Cloudflare.** Sign in and create a Hyperdrive config pointing at the production database:
@@ -150,6 +173,10 @@ project. Use a separate Neon branch (for example `dev`) for development.
   server for both REST and WebSocket requests.
 - Cookie-authenticated writes are rejected unless they come from a trusted origin.
 - Guests get a 12-hour token scoped to one room.
+- Candidates can't connect to a room's private document, and the interviewer-only question API
+  rejects them. Test results are filtered on the server, so a candidate's copy never contains
+  hidden tests' input or expected output.
+- Pyodide and the whiteboard fonts are served from the app's own origin, not a third-party CDN.
 - Candidate code runs in a dedicated worker that has its network, messaging and storage APIs
   removed before the code starts. In production the worker script is also served with a
   Content-Security-Policy that only allows loading Pyodide from the app's own origin.
@@ -160,5 +187,7 @@ project. Use a separate Neon branch (for example `dev`) for development.
 - Only Python, JavaScript and TypeScript can be run; Java, C++, C and Go can be edited but not run.
 - Output printed before a program hits the 10-second time limit is not shown.
 - Code runs are reported by the browser that ran them, so a participant could fake their own
-  run's output.
+  run's output. Tests run in an interviewer's browser (which already holds the hidden tests), so
+  **Run tests** needs an interviewer in the room.
+- Images can't be added to the whiteboard.
 - Sign-in by email link isn't available (it needs an email sender and a domain).
