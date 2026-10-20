@@ -107,12 +107,15 @@ async function runPython(req: RunRequest): Promise<RunOutput> {
   const stdout = new OutputBuffer();
   const stderr = new OutputBuffer();
   const decoder = new TextDecoder();
-  let stdinSent = false;
+  // Byte-level reads: Pyodide's string-returning `stdin` handler truncates large inputs.
+  const input = new TextEncoder().encode(req.stdin);
+  let offset = 0;
   pyodide.setStdin({
-    stdin: () => {
-      if (stdinSent) return undefined;
-      stdinSent = true;
-      return req.stdin;
+    read: (buffer) => {
+      const n = Math.min(buffer.length, input.length - offset);
+      buffer.set(input.subarray(offset, offset + n));
+      offset += n;
+      return n;
     },
   });
   pyodide.setStdout({ write: (buf) => (stdout.write(decoder.decode(buf)), buf.length) });
