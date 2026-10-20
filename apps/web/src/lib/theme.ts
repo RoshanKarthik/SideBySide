@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -20,4 +20,12 @@ export function useTheme() {
     window.dispatchEvent(new CustomEvent('sbs-theme', { detail: next }));
   }, []);
   return { theme, toggle };
+}
+
+/** The current theme, following toggles made anywhere on the page. */
+export function useCurrentTheme(): Theme {
+  return useSyncExternalStore((cb) => {
+    window.addEventListener('sbs-theme', cb);
+    return () => window.removeEventListener('sbs-theme', cb);
+  }, current);
 }

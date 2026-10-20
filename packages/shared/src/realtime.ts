@@ -85,4 +85,13 @@ export interface PresenceState {
     role: string;
   };
   tab: 'discuss' | 'code' | 'design';
+  /** Whiteboard pointer in scene coordinates, while on the Design tab. */
+  pointer?: BoardPointer | null;
+}
+
+export interface BoardPointer {
+  x: number;
+  y: number;
+  tool: 'pointer' | 'laser';
+  button: 'up' | 'down';
 }

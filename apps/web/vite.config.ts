@@ -10,6 +10,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = (name: string) => fs.realpathSync(path.join(here, 'node_modules', name));
 const monacoRoot = packageRoot('monaco-editor');
 const pyodideRoot = packageRoot('pyodide');
+const excalidrawRoot = packageRoot('@excalidraw/excalidraw');
 
 /** Serves Pyodide (Python in WebAssembly) from our own origin instead of a third-party CDN. */
 function copyPyodide(): Plugin {
@@ -30,13 +31,37 @@ function copyPyodide(): Plugin {
   };
 }
 
+/** Serves Excalidraw's fonts from our own origin (it would otherwise fetch them from esm.sh). */
+function copyExcalidrawFonts(): Plugin {
+  return {
+    name: 'copy-excalidraw-fonts',
+    buildStart() {
+      const from = path.join(excalidrawRoot, 'dist', 'prod', 'fonts');
+      const to = path.join(here, 'public', 'excalidraw', 'fonts');
+      const marker = path.join(to, '.version');
+      const version = (
+        JSON.parse(fs.readFileSync(path.join(excalidrawRoot, 'package.json'), 'utf8')) as {
+          version: string;
+        }
+      ).version;
+      if (fs.existsSync(marker) && fs.readFileSync(marker, 'utf8') === version) return;
+      fs.rmSync(to, { recursive: true, force: true });
+      fs.cpSync(from, to, { recursive: true });
+      fs.writeFileSync(marker, version);
+    },
+  };
+}
+
 const apiTarget = process.env.VITE_DEV_API ?? 'http://127.0.0.1:8787';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), copyPyodide()],
+  plugins: [react(), tailwindcss(), copyPyodide(), copyExcalidrawFonts()],
   // Pre-bundle what the room's lazy chunks and the runner worker import, so opening them the
   // first time doesn't make Vite reload the page in development.
-  optimizeDeps: { exclude: ['pyodide'], include: ['sucrase', 'y-monaco'] },
+  optimizeDeps: {
+    exclude: ['pyodide'],
+    include: ['sucrase', 'y-monaco', '@excalidraw/excalidraw'],
+  },
   resolve: {
     alias: [
       { find: '@', replacement: path.join(here, 'src') },

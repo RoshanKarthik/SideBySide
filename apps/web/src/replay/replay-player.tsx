@@ -5,15 +5,19 @@ import Collaboration from '@tiptap/extension-collaboration';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { ArrowLeft, Code2, NotebookPen, Pause, Play } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Code2, NotebookPen, Pause, PenTool, Play } from 'lucide-react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type * as Y from 'yjs';
 import { ThemeToggle } from '@/components/layout';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/card';
 import { NativeSelect } from '@/components/ui/form';
 import { monaco } from '@/editor/monaco';
 import { cn, formatClock } from '@/lib/utils';
+
+// The whiteboard library is large; load it only when the Design tab is opened.
+const ReplayBoard = lazy(() => import('@/design/replay-board'));
 
 const SPEEDS = [1, 2, 4, 8] as const;
 
@@ -29,7 +33,7 @@ export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log:
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const [generation, setGeneration] = useState(0);
-  const [tab, setTab] = useState<'discuss' | 'code'>('code');
+  const [tab, setTab] = useState<'discuss' | 'code' | 'design'>('code');
 
   const seek = useCallback(
     (t: number) => {
@@ -80,6 +84,7 @@ export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log:
           [
             { id: 'discuss', label: 'Discuss', icon: NotebookPen },
             { id: 'code', label: 'Code', icon: Code2 },
+            { id: 'design', label: 'Design', icon: PenTool },
           ] as const
         ).map(({ id, label, icon: Icon }) => (
           <button
@@ -100,10 +105,18 @@ export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log:
       </nav>
 
       <main className="min-h-0 flex-1">
-        {tab === 'discuss' ? (
-          <ReplayNotes key={generation} doc={cursor.doc} />
-        ) : (
-          <ReplayCode key={generation} doc={cursor.doc} time={time} />
+        {tab === 'discuss' && <ReplayNotes key={generation} doc={cursor.doc} />}
+        {tab === 'code' && <ReplayCode key={generation} doc={cursor.doc} time={time} />}
+        {tab === 'design' && (
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center text-muted-foreground">
+                <Spinner />
+              </div>
+            }
+          >
+            <ReplayBoard doc={cursor.doc} time={time} />
+          </Suspense>
         )}
       </main>
 

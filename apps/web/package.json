@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
     "@sidebyside/shared": "workspace:*",
     "@tanstack/react-query": "^5.104.5",
     "@tiptap/extension-collaboration": "^3.32.0",

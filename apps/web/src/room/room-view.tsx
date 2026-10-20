@@ -17,12 +17,14 @@ import { useTestHost } from './use-test-host';
 
 // Monaco is large; it loads the first time someone opens the Code tab.
 const CodePanel = lazy(() => import('@/editor/code-panel'));
+// Same for the whiteboard and the Design tab.
+const DesignBoard = lazy(() => import('@/design/design-board'));
 
 type Tab = PresenceState['tab'];
-const TABS: { id: Tab; label: string; icon: typeof Code2; disabled?: boolean }[] = [
+const TABS: { id: Tab; label: string; icon: typeof Code2 }[] = [
   { id: 'discuss', label: 'Discuss', icon: NotebookPen },
   { id: 'code', label: 'Code', icon: Code2 },
-  { id: 'design', label: 'Design', icon: PenTool, disabled: true },
+  { id: 'design', label: 'Design', icon: PenTool },
 ];
 
 export function RoomView({ slug, membership }: { slug: string; membership: JoinRoomResponse }) {
@@ -30,6 +32,7 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
   const conn = useRoom(room, participant, slug);
   const [tab, setTab] = useState<Tab>('discuss');
   const [codeOpened, setCodeOpened] = useState(false);
+  const [designOpened, setDesignOpened] = useState(false);
   const interviewer = isInterviewerRole(participant.role);
   const privateDoc = usePrivateDoc(room, interviewer);
   const runningTestsFor = useTestHost(conn, room, slug, interviewer);
@@ -56,6 +59,7 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
     if (next === tab) return;
     setTab(next);
     if (next === 'code') setCodeOpened(true);
+    if (next === 'design') setDesignOpened(true);
     conn.setTab(next);
     conn.send({ kind: 'event', event: { type: 'tab_changed', payload: { tab: next } } });
   };
@@ -111,24 +115,20 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
       </header>
 
       <nav role="tablist" aria-label="Room" className="flex gap-1 border-b px-3">
-        {TABS.map(({ id, label, icon: Icon, disabled }) => (
+        {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             role="tab"
             type="button"
             aria-selected={tab === id}
-            disabled={disabled}
             onClick={() => switchTab(id)}
             className={cn(
-              '-mb-px flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+              '-mb-px flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground',
               tab === id && 'border-primary text-foreground',
             )}
           >
             <Icon className="size-4" />
             {label}
-            {disabled && (
-              <span className="rounded bg-muted px-1 text-[10px] font-normal">soon</span>
-            )}
             <TabPeers peers={conn.peers} tab={id} self={conn.doc.clientID} />
           </button>
         ))}
@@ -167,6 +167,24 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
                 }
               >
                 <CodePanel conn={conn} participant={participant} interviewer={interviewer} />
+              </Suspense>
+            </section>
+          )}
+          {designOpened && (
+            <section role="tabpanel" hidden={tab !== 'design'} className="h-full">
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Spinner /> Loading the whiteboard…
+                  </div>
+                }
+              >
+                <DesignBoard
+                  conn={conn}
+                  interviewer={interviewer}
+                  active={tab === 'design'}
+                  readOnly={!interviewer && conn.locked}
+                />
               </Suspense>
             </section>
           )}

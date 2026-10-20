@@ -116,6 +116,9 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
       awarenessQueued = true;
       queueMicrotask(readAwareness);
     };
+    // Whiteboard pointers and editor carets change awareness constantly; only re-render the
+    // room when who is here, or which tab they're on, changes.
+    let peersKey = '';
     const readAwareness = () => {
       awarenessQueued = false;
       const list: Peer[] = [];
@@ -124,6 +127,9 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
           list.push({ clientId, state: state as PresenceState });
         }
       });
+      const key = JSON.stringify(list.map((p) => [p.clientId, p.state.user, p.state.tab]));
+      if (key === peersKey) return;
+      peersKey = key;
       setPeers(list);
     };
     const onCustom = (raw: string) => {
