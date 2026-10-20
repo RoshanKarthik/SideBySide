@@ -1,7 +1,12 @@
-import { CONSENT_NOTICE, type JoinRoomResponse, type PublicRoom } from '@sidebyside/shared';
+import {
+  CONSENT_NOTICE,
+  isInterviewerRole,
+  type JoinRoomResponse,
+  type PublicRoom,
+} from '@sidebyside/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, ErrorNote, Spinner } from '@/components/ui/card';
@@ -15,6 +20,8 @@ import { NotFoundPage } from './not-found';
 /** `/r/:slug` — the join page, or the room itself once the visitor is a participant. */
 export default function RoomRoute() {
   const { slug = '' } = useParams();
+  const [params] = useSearchParams();
+  const invite = params.get('invite');
   const publicInfo = useQuery({
     queryKey: ['room-public', slug],
     queryFn: () => api.json<PublicRoom>(`/rooms/${slug}/public`),
@@ -39,6 +46,10 @@ export default function RoomRoute() {
     );
   }
   if (publicInfo.error) return <NotFoundPage message="This room link is not valid." />;
+  if (invite && !(membership.data && isInterviewerRole(membership.data.participant.role))) {
+    if (publicInfo.data.status === 'ended') return <EndedNotice title={publicInfo.data.title} />;
+    return <CoInterviewerInvite slug={slug} token={invite} room={publicInfo.data} />;
+  }
   if (membership.data) return <RoomView slug={slug} membership={membership.data} />;
   if (publicInfo.data.status === 'ended') return <EndedNotice title={publicInfo.data.title} />;
   return <JoinForm slug={slug} room={publicInfo.data} />;
@@ -50,6 +61,68 @@ function EndedNotice({ title }: { title: string }) {
       <div className="mx-auto max-w-md px-4 py-24 text-center">
         <h1 className="text-2xl font-bold">{title}</h1>
         <p className="mt-2 text-muted-foreground">This session has ended.</p>
+      </div>
+    </AppShell>
+  );
+}
+
+/** `/r/:slug?invite=…` — a colleague joining the interviewer side of the room. */
+function CoInterviewerInvite({
+  slug,
+  token,
+  room,
+}: {
+  slug: string;
+  token: string;
+  room: PublicRoom;
+}) {
+  const { data: session, isPending } = useSession();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const accept = useMutation({
+    mutationFn: () =>
+      api.json<JoinRoomResponse>(`/rooms/${slug}/co-interviewer`, {
+        method: 'POST',
+        body: { token },
+      }),
+    onSuccess: (res) => {
+      queryClient.setQueryData(['room-me', slug], res);
+      navigate(`/r/${slug}`, { replace: true });
+    },
+  });
+
+  if (isPending) return null;
+  if (!session) {
+    const next = `/r/${slug}?invite=${encodeURIComponent(token)}`;
+    return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
+  }
+
+  return (
+    <AppShell>
+      <div className="mx-auto max-w-md px-4 py-16">
+        <Card className="p-6">
+          <p className="text-sm text-muted-foreground">
+            {room.ownerName} invited you to interview with them in
+          </p>
+          <h1 className="mt-1 text-xl font-semibold">{room.title}</h1>
+          <p className="mt-4 text-sm text-muted-foreground">
+            As a co-interviewer you see the private panel: questions, hidden tests, private notes
+            and the rubric. You join as {session.user.name}.
+          </p>
+          {accept.error && (
+            <div className="mt-4">
+              <ErrorNote>{accept.error.message}</ErrorNote>
+            </div>
+          )}
+          <Button
+            className="mt-6 w-full"
+            disabled={accept.isPending}
+            onClick={() => accept.mutate()}
+          >
+            {accept.isPending && <Spinner />}
+            Join as co-interviewer
+          </Button>
+        </Card>
       </div>
     </AppShell>
   );
