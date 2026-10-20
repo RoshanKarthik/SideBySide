@@ -3,3 +3,5 @@ dist
 .wrangler
 .turbo
 packages/db/migrations
+apps/web/public/pyodide
+apps/web/public/excalidraw
