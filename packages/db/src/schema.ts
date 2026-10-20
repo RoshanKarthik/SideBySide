@@ -1,4 +1,5 @@
 import {
+  DIFFICULTIES,
   LANGUAGES,
   ROOM_MODES,
   ROOM_ROLES,
@@ -39,6 +40,7 @@ export const roomRoleEnum = pgEnum('room_role', ROOM_ROLES);
 export const visibilityEnum = pgEnum('visibility', VISIBILITIES);
 export const runKindEnum = pgEnum('run_kind', ['run', 'tests']);
 export const runStatusEnum = pgEnum('run_status', RUN_STATUSES);
+export const difficultyEnum = pgEnum('difficulty', DIFFICULTIES);
 
 // ---------------------------------------------------------------------------
 // Auth (managed by Better Auth; property names are the ones Better Auth expects)
@@ -130,6 +132,8 @@ export const rooms = pgTable(
     startedAt: timestamp('started_at', { withTimezone: true }),
     endedAt: timestamp('ended_at', { withTimezone: true }),
     deleteAfter: timestamp('delete_after', { withTimezone: true }),
+    /** Secret in the co-interviewer invite link; rotate it to revoke old links. */
+    coInterviewerToken: text('co_interviewer_token'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -237,8 +241,84 @@ export const codeRuns = pgTable(
   (t) => [index('code_runs_room_ts_idx').on(t.roomId, t.serverTs)],
 );
 
+// ---------------------------------------------------------------------------
+// Questions, tests and scoring
+// ---------------------------------------------------------------------------
+
+export const questions = pgTable(
+  'questions',
+  {
+    id: id(),
+    /** Null for the public practice bank. */
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }),
+    /** Stable key for seeded public questions, so re-seeding updates instead of duplicating. */
+    seedKey: text('seed_key').unique(),
+    title: text('title').notNull(),
+    descriptionMd: text('description_md').notNull().default(''),
+    difficulty: difficultyEnum('difficulty').notNull().default('medium'),
+    tags: text('tags').array().notNull().default([]),
+    starterCode: jsonb('starter_code').$type<Record<string, string>>().notNull().default({}),
+    hints: text('hints').array().notNull().default([]),
+    isPublic: boolean('is_public').notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('questions_owner_idx').on(t.ownerId), index('questions_public_idx').on(t.isPublic)],
+);
+
+export const testCases = pgTable(
+  'test_cases',
+  {
+    id: id(),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    stdin: text('stdin').notNull().default(''),
+    expectedStdout: text('expected_stdout').notNull().default(''),
+    isHidden: boolean('is_hidden').notNull().default(false),
+    weight: integer('weight').notNull().default(1),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index('test_cases_question_idx').on(t.questionId, t.sortOrder)],
+);
+
+export const roomQuestions = pgTable(
+  'room_questions',
+  {
+    id: id(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    /** Kept as null if the question is later deleted; the title below survives. */
+    questionId: uuid('question_id').references(() => questions.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    roundNumber: integer('round_number').notNull().default(1),
+    shownAt: timestamp('shown_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (t) => [index('room_questions_room_idx').on(t.roomId)],
+);
+
+export const rubricScores = pgTable(
+  'rubric_scores',
+  {
+    id: id(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    roundNumber: integer('round_number').notNull().default(1),
+    criterion: text('criterion').notNull(),
+    score: integer('score'),
+    comment: text('comment').notNull().default(''),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('rubric_scores_room_criterion_idx').on(t.roomId, t.roundNumber, t.criterion)],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type RoomRow = typeof rooms.$inferSelect;
 export type ParticipantRow = typeof participants.$inferSelect;
 export type EventRow = typeof events.$inferSelect;
 export type CodeRunRow = typeof codeRuns.$inferSelect;
+export type QuestionRow = typeof questions.$inferSelect;
+export type TestCaseRow = typeof testCases.$inferSelect;

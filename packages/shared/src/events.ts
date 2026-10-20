@@ -50,16 +50,29 @@ export const EVENT_PAYLOAD_SCHEMAS = {
   language_changed: z.object({ from: langSchema, to: langSchema }),
   code_run: codeRunPayloadSchema,
   session_ended: z.object({}),
+  question_shown: z.object({ questionId: z.string(), title: z.string() }),
+  hint_revealed: z.object({ questionId: z.string(), hintIndex: z.number().int() }),
+  tests_run: z.object({
+    questionId: z.string(),
+    language: langSchema,
+    passed: z.number().int(),
+    total: z.number().int(),
+  }),
+  editor_locked: z.object({}),
+  editor_unlocked: z.object({}),
+  note_timestamp: z.object({ offsetMs: z.number().int().nonnegative(), text: z.string().max(200) }),
 } satisfies Partial<Record<EventType, z.ZodType>>;
 
 /** Event types a client may send itself; everything else is produced by the server. */
-export const CLIENT_EVENT_TYPES = ['tab_changed', 'language_changed'] as const;
+export const CLIENT_EVENT_TYPES = ['tab_changed', 'language_changed', 'note_timestamp'] as const;
 export const clientEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tab_changed'), payload: EVENT_PAYLOAD_SCHEMAS.tab_changed }),
   z.object({
     type: z.literal('language_changed'),
     payload: EVENT_PAYLOAD_SCHEMAS.language_changed,
   }),
+  // Only accepted on the interviewers' private document.
+  z.object({ type: z.literal('note_timestamp'), payload: EVENT_PAYLOAD_SCHEMAS.note_timestamp }),
 ]);
 export type ClientEvent = z.infer<typeof clientEventSchema>;
 

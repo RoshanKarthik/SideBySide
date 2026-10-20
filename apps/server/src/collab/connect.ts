@@ -1,4 +1,4 @@
-import { and, connectDb, eq, rooms } from '@sidebyside/db';
+import { and, connectDb, eq, rooms, type DbHandle } from '@sidebyside/db';
 import type { Lobby } from 'partyserver';
 import { createAuth } from '../auth/auth';
 import { findRoomById, isUuid, resolveMembership } from '../auth/identity';
@@ -23,13 +23,14 @@ const deny = (status: number, message: string) => new Response(message, { status
  */
 export async function authorizeConnection(
   request: Request,
-  lobby: Lobby<Env>,
+  lobby: Pick<Lobby<Env>, 'name'>,
   env: Env,
+  openDb: (env: Env) => Promise<DbHandle> = (e) => connectDb(e.HYPERDRIVE.connectionString),
 ): Promise<Request | Response> {
   const target = parseDocumentName(lobby.name);
   if (!target) return deny(404, 'Unknown document');
 
-  const handle = await connectDb(env.HYPERDRIVE.connectionString);
+  const handle = await openDb(env);
   try {
     const room = await findRoomById(handle.db, target.roomId);
     if (!room) return deny(404, 'Room not found');

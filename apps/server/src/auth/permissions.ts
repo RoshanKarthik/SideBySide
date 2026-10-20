@@ -53,3 +53,12 @@ export function canSeeEvent(role: RoomRole, visibility: Visibility): boolean {
 export function canRecordRun(room: Pick<RoomAccessFacts, 'status'>): boolean {
   return room.status === 'live';
 }
+
+/** Loading questions, revealing hints, locking the editor, seeing hidden tests. */
+export function canManageInterview(role: RoomRole): boolean {
+  return isInterviewerRole(role);
+}
+
+export function canInviteInterviewers(role: RoomRole): boolean {
+  return role === 'owner';
+}

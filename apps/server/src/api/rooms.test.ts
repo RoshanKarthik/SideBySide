@@ -26,7 +26,12 @@ beforeAll(async () => {
   handle = await createTestDb();
   const deps: AppDeps = {
     openDb: async () => ({ db: handle.db, close: async () => {} }),
-    room: async () => ({ end, getReplayLog: async () => new Uint8Array([1]) }),
+    room: async () => ({
+      end,
+      getReplayLog: async () => new Uint8Array([1]),
+      showQuestion: async () => {},
+      revealHint: async () => true,
+    }),
   };
   app = createApp(deps);
 });
@@ -162,7 +167,8 @@ describe('interview room flow', () => {
     const res = await call(`/api/rooms/${roomId}/end`, { method: 'POST', cookie: owner });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { room: { status: string } }).room.status).toBe('ended');
-    expect(end).toHaveBeenCalledTimes(1);
+    // Both the shared and the private document are closed.
+    expect(end).toHaveBeenCalledTimes(2);
 
     const manifest = await call(`/api/rooms/${roomId}/replay/manifest`, { cookie: owner });
     expect(manifest.status).toBe(200);

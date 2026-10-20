@@ -247,7 +247,10 @@ export function roomRoutes(deps: AppDeps) {
           serverTs: endedAt,
         });
       });
-      await (await deps.room(c.env, room.id)).end();
+      await Promise.all([
+        (await deps.room(c.env, room.id, 'shared')).end(),
+        (await deps.room(c.env, room.id, 'private')).end(),
+      ]);
     }
     const updated = await findRoomById(c.var.db, room.id);
     return c.json({ room: toRoomDto(updated ?? room) });

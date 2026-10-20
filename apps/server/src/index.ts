@@ -9,10 +9,10 @@ export { Room } from './collab/room';
 
 const deps: AppDeps = {
   openDb: (env) => connectDb(env.HYPERDRIVE.connectionString),
-  room: async (env, roomId) =>
+  room: async (env, roomId, part = 'shared') =>
     (await getServerByName(
       env.Room as unknown as DurableObjectNamespace<Server>,
-      `${roomId}--shared`,
+      `${roomId}--${part}`,
     )) as unknown as DurableObjectStub<Room>,
 };
 

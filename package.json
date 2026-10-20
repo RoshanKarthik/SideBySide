@@ -16,7 +16,8 @@
     "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @sidebyside/db generate",
     "db:migrate": "pnpm --filter @sidebyside/db migrate",
-    "deploy": "pnpm build && pnpm --filter @sidebyside/server run deploy"
+    "deploy": "pnpm build && pnpm --filter @sidebyside/server run deploy",
+    "db:seed": "pnpm --filter @sidebyside/db seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,25 +1,50 @@
 import {
+  asc,
+  codeRuns,
+  connectDb,
+  eq,
+  events,
+  participants,
+  rubricScores,
+  testCases,
+  type Database,
+} from '@sidebyside/db';
+import {
   LIMITS,
   SNAPSHOT_INTERVAL_MS,
   clientMessageSchema,
   eventVisibility,
+  isInterviewerRole,
+  type ClientMessage,
   type EventType,
+  type Lang,
   type RoomEvent,
   type RunRecord,
   type ServerMessage,
 } from '@sidebyside/shared';
-import { initializeSharedDoc } from '@sidebyside/shared/doc';
+import {
+  getHints,
+  getRubric,
+  initializeSharedDoc,
+  readProblem,
+  showQuestionInDoc,
+  type SharedProblem,
+} from '@sidebyside/shared/doc';
 import { encodeReplayLog, type ReplaySnapshot, type ReplayUpdate } from '@sidebyside/shared/replay';
-import { codeRuns, connectDb, eq, events, participants, type Database } from '@sidebyside/db';
 import type { Connection, ConnectionContext } from 'partyserver';
 import { YServer } from 'y-partyserver';
 import * as Y from 'yjs';
-import { canRecordRun } from '../auth/permissions';
+import { canRecordRun, type DocumentPart } from '../auth/permissions';
+import type { Actor } from '../context';
 import { CLOSE_CODES, CONNECTION_HEADER, type ConnectionInfo } from './protocol';
+import { buildTestRuns, type StoredTest } from './test-results';
 
 const FLUSH_INTERVAL_MS = 2_000;
 const FLUSH_MAX_UPDATES = 200;
 const CLIENT_EVENTS_PER_MINUTE = 60;
+const TEST_RUNS_PER_MINUTE = 5;
+/** Long enough for the interviewer's browser to load Python on a slow connection. */
+const TEST_REQUEST_TIMEOUT_MS = 120_000;
 
 interface PendingUpdate {
   ts: number;
@@ -29,6 +54,21 @@ interface PendingUpdate {
 
 interface ConnectionState {
   sbs?: ConnectionInfo;
+}
+
+interface PendingTestRequest {
+  requestId: string;
+  questionId: string;
+  language: Lang;
+  requester: ConnectionInfo;
+  requesterConnectionId: string;
+  runnerConnectionId: string;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+export interface ShowQuestionInput {
+  problem: SharedProblem;
+  starterCode: Partial<Record<Lang, string>>;
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -57,8 +97,9 @@ class MinuteLimiter {
 }
 
 /**
- * One Durable Object per room document. It syncs the Yjs document between participants and
- * keeps every update with a server timestamp (plus a snapshot every minute) for replay.
+ * One Durable Object per room document (`<roomId>--shared` for everyone, `<roomId>--private`
+ * for interviewers). It syncs the Yjs document between participants and keeps every update
+ * with a server timestamp (plus a snapshot every minute) for replay.
  */
 export class Room extends YServer {
   static override options = { hibernate: true };
@@ -67,11 +108,23 @@ export class Room extends YServer {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private lastSnapshotTs = 0;
   private ended = false;
+  private locked = false;
+  private runCount = 0;
   private runLimiter = new MinuteLimiter(LIMITS.runsPerMinute);
+  private testLimiter = new MinuteLimiter(TEST_RUNS_PER_MINUTE);
   private eventLimiter = new MinuteLimiter(CLIENT_EVENTS_PER_MINUTE);
+  private testRequests = new Map<string, PendingTestRequest>();
 
   private get store() {
     return this.ctx.storage.sql;
+  }
+
+  private get part(): DocumentPart {
+    return this.name.endsWith('--private') ? 'private' : 'shared';
+  }
+
+  private get roomId(): string {
+    return this.name.split('--')[0]!;
   }
 
   override async onLoad(): Promise<void> {
@@ -91,6 +144,7 @@ export class Room extends YServer {
     );
 
     this.ended = this.readMeta('ended') === 'true';
+    this.locked = this.readMeta('locked') === 'true';
     this.runCount = Number(this.readMeta('runCount') ?? 0);
 
     // Rebuild the document: latest snapshot, then every update stored after it.
@@ -130,7 +184,9 @@ export class Room extends YServer {
   override async onConnect(connection: Connection, ctx: ConnectionContext): Promise<void> {
     const raw = ctx.request.headers.get(CONNECTION_HEADER);
     const info = raw ? (JSON.parse(raw) as ConnectionInfo) : null;
-    if (!info) {
+    // The Worker already checked this; refusing here too keeps the private document safe
+    // even if routing changes.
+    if (!info || (this.part === 'private' && !isInterviewerRole(info.role))) {
       connection.close(CLOSE_CODES.unauthorized, 'Unauthorized');
       return;
     }
@@ -140,11 +196,14 @@ export class Room extends YServer {
     }
     connection.setState((prev: ConnectionState | null) => ({ ...prev, sbs: info }));
     // Creates the per-language buffers once, on the server, before anyone edits.
-    initializeSharedDoc(this.document, info.defaultLanguage);
+    if (this.part === 'shared') initializeSharedDoc(this.document, info.defaultLanguage);
     await super.onConnect(connection, ctx);
 
-    if (this.connectionsOf(info.participantId, connection.id) === 0) {
-      void this.recordEvent(info, 'participant_joined', { displayName: info.displayName });
+    if (this.part === 'shared') {
+      this.send(connection, { kind: 'lock_state', locked: this.locked });
+      if (this.connectionsOf(info.participantId, connection.id) === 0) {
+        void this.recordEvent(info, 'participant_joined', { displayName: info.displayName });
+      }
     }
   }
 
@@ -156,7 +215,12 @@ export class Room extends YServer {
   ): Promise<void> {
     await super.onClose(connection, code, reason, wasClean);
     const info = infoOf(connection);
-    if (info && !this.ended && this.connectionsOf(info.participantId, connection.id) === 0) {
+    if (
+      info &&
+      this.part === 'shared' &&
+      !this.ended &&
+      this.connectionsOf(info.participantId, connection.id) === 0
+    ) {
       void this.recordEvent(info, 'participant_left', { displayName: info.displayName });
       void this.withDb((db) =>
         db
@@ -165,11 +229,19 @@ export class Room extends YServer {
           .where(eq(participants.id, info.participantId)),
       );
     }
+    for (const req of this.testRequests.values()) {
+      if (req.runnerConnectionId === connection.id) {
+        this.failTestRequest(req, 'The interviewer running the tests disconnected.');
+      }
+    }
     if (this.openConnectionCount(connection.id) === 0) this.flush();
   }
 
-  override isReadOnly(_connection: Connection): boolean {
-    return this.ended;
+  /** Read-only after the session ends, and for candidates while the interviewer has locked it. */
+  override isReadOnly(connection: Connection): boolean {
+    if (this.ended) return true;
+    const info = infoOf(connection);
+    return this.locked && !(info && isInterviewerRole(info.role));
   }
 
   override onCustomMessage(connection: Connection, message: string): void {
@@ -184,29 +256,76 @@ export class Room extends YServer {
     const result = clientMessageSchema.safeParse(parsed);
     if (!result.success) return this.sendError(connection, 'bad_message', 'Invalid message');
     if (this.ended) return this.sendError(connection, 'session_ended', 'The session has ended');
+    void this.handle(connection, info, result.data);
+  }
 
-    const msg = result.data;
-    if (msg.kind === 'event') {
-      if (!this.eventLimiter.allow(info.participantId)) return;
-      void this.recordEvent(info, msg.event.type, msg.event.payload);
-    } else {
-      void this.recordRun(connection, info, msg.run);
+  private async handle(connection: Connection, info: ConnectionInfo, msg: ClientMessage) {
+    const interviewer = isInterviewerRole(info.role);
+    switch (msg.kind) {
+      case 'event': {
+        if (!this.eventLimiter.allow(info.participantId)) return;
+        // Interviewer note timestamps belong to the private document only.
+        const privateEvent = msg.event.type === 'note_timestamp';
+        if (privateEvent !== (this.part === 'private')) return;
+        return this.recordEvent(info, msg.event.type, msg.event.payload);
+      }
+      case 'code_run':
+        if (this.part !== 'shared') return;
+        return this.recordRun(connection, info, msg.run);
+      case 'set_lock':
+        if (this.part !== 'shared') return;
+        if (!interviewer)
+          return this.sendError(connection, 'forbidden', 'Only interviewers can lock the editor');
+        return this.setLock(info, msg.locked);
+      case 'run_tests':
+        if (this.part !== 'shared') return;
+        return this.requestTests(connection, info, msg.requestId, msg.questionId, msg.language);
+      case 'tests_result':
+        if (this.part !== 'shared' || !interviewer) return;
+        return this.completeTests(connection, msg.requestId, msg.source, msg.outcomes);
     }
   }
 
   // ---------------------------------------------------------------------------
-  // RPC (called by the Worker)
+  // RPC (called by the Worker after its own permission checks)
   // ---------------------------------------------------------------------------
 
   async end(): Promise<void> {
+    if (this.part === 'private') await this.persistRubric();
     this.flush();
     this.writeSnapshot(this.lastUpdateId());
     this.ended = true;
     this.writeMeta('ended', 'true');
+    for (const req of this.testRequests.values()) clearTimeout(req.timer);
+    this.testRequests.clear();
     this.broadcastMessage({ kind: 'session_ended' });
     for (const connection of this.getConnections()) {
       connection.close(CLOSE_CODES.sessionEnded, 'Session ended');
     }
+  }
+
+  async showQuestion(actor: Actor, input: ShowQuestionInput): Promise<void> {
+    if (this.ended || this.part !== 'shared') return;
+    showQuestionInDoc(this.document, input.problem, input.starterCode);
+    await this.recordEvent(actor, 'question_shown', {
+      questionId: input.problem.questionId,
+      title: input.problem.title,
+    });
+  }
+
+  async revealHint(
+    actor: Actor,
+    questionId: string,
+    index: number,
+    text: string,
+  ): Promise<boolean> {
+    if (this.ended || this.part !== 'shared') return false;
+    if (readProblem(this.document)?.questionId !== questionId) return false;
+    const hints = getHints(this.document);
+    if (hints.toArray().some((h) => h.index === index)) return true;
+    hints.push([{ index, text }]);
+    await this.recordEvent(actor, 'hint_revealed', { questionId, hintIndex: index });
+    return true;
   }
 
   async getReplayLog(): Promise<Uint8Array> {
@@ -232,10 +351,179 @@ export class Room extends YServer {
   }
 
   // ---------------------------------------------------------------------------
-  // Persistence
+  // Editor lock
   // ---------------------------------------------------------------------------
 
-  private runCount = 0;
+  private async setLock(info: ConnectionInfo, locked: boolean) {
+    if (this.locked === locked) return;
+    this.locked = locked;
+    this.writeMeta('locked', String(locked));
+    this.broadcastMessage({ kind: 'lock_state', locked });
+    await this.recordEvent(info, locked ? 'editor_locked' : 'editor_unlocked', {});
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tests: run in an interviewer's browser, filtered here by role
+  // ---------------------------------------------------------------------------
+
+  private requestTests(
+    connection: Connection,
+    info: ConnectionInfo,
+    requestId: string,
+    questionId: string,
+    language: Lang,
+  ) {
+    const fail = (message: string) =>
+      this.send(connection, { kind: 'tests_failed', requestId, message });
+    if (readProblem(this.document)?.questionId !== questionId) {
+      return fail('That question is no longer the active one.');
+    }
+    if (!this.testLimiter.allow(info.participantId)) {
+      return fail(`Up to ${TEST_RUNS_PER_MINUTE} test runs a minute.`);
+    }
+    if (this.testRequests.has(requestId)) return;
+    // Prefer the requester if they are an interviewer; otherwise any connected interviewer.
+    let runner: Connection | undefined;
+    if (isInterviewerRole(info.role)) runner = connection;
+    else {
+      for (const c of this.getConnections()) {
+        const ci = infoOf(c);
+        if (ci && isInterviewerRole(ci.role)) {
+          runner = c;
+          break;
+        }
+      }
+    }
+    if (!runner) {
+      return fail('Tests run in the interviewer’s browser, and no interviewer is connected.');
+    }
+    const req: PendingTestRequest = {
+      requestId,
+      questionId,
+      language,
+      requester: info,
+      requesterConnectionId: connection.id,
+      runnerConnectionId: runner.id,
+      timer: setTimeout(() => {
+        const pending = this.testRequests.get(requestId);
+        if (pending) this.failTestRequest(pending, 'The test run took too long.');
+      }, TEST_REQUEST_TIMEOUT_MS),
+    };
+    this.testRequests.set(requestId, req);
+    this.send(runner, {
+      kind: 'tests_requested',
+      requestId,
+      questionId,
+      language,
+      requestedByName: info.displayName,
+    });
+  }
+
+  private failTestRequest(req: PendingTestRequest, message: string) {
+    clearTimeout(req.timer);
+    this.testRequests.delete(req.requestId);
+    const requester = this.getConnection(req.requesterConnectionId);
+    if (requester)
+      this.send(requester, { kind: 'tests_failed', requestId: req.requestId, message });
+  }
+
+  private async completeTests(
+    connection: Connection,
+    requestId: string,
+    source: string,
+    outcomes: Parameters<typeof buildTestRuns>[1],
+  ) {
+    const req = this.testRequests.get(requestId);
+    if (!req || req.runnerConnectionId !== connection.id) return;
+    clearTimeout(req.timer);
+    this.testRequests.delete(requestId);
+
+    const tests = await this.queryDb((db) =>
+      db
+        .select({
+          id: testCases.id,
+          stdin: testCases.stdin,
+          expectedStdout: testCases.expectedStdout,
+          isHidden: testCases.isHidden,
+        })
+        .from(testCases)
+        .where(eq(testCases.questionId, req.questionId))
+        .orderBy(asc(testCases.sortOrder)),
+    );
+    if (!tests) return this.failTestRequest(req, 'Could not load the tests.');
+
+    const serverTs = Date.now();
+    const { full, candidate } = buildTestRuns(tests as StoredTest[], outcomes, {
+      requestId,
+      questionId: req.questionId,
+      questionTitle: readProblem(this.document)?.title ?? '',
+      language: req.language,
+      requestedBy: req.requester.displayName,
+      serverTs,
+    });
+    // Hidden test contents go only to interviewers.
+    for (const c of this.getConnections()) {
+      const ci = infoOf(c);
+      if (!ci) continue;
+      this.send(c, {
+        kind: 'tests_result',
+        run: isInterviewerRole(ci.role) ? full : candidate,
+      });
+    }
+
+    await this.withDb((db) =>
+      db.insert(codeRuns).values({
+        roomId: req.requester.roomId,
+        participantId: req.requester.participantId,
+        language: req.language,
+        sourceCode: source,
+        stdin: '',
+        kind: 'tests',
+        questionId: req.questionId,
+        status: full.passed === full.total ? 'ok' : 'error',
+        testsPassed: full.passed,
+        testsTotal: full.total,
+        details: full.results,
+        serverTs: new Date(serverTs),
+      }),
+    );
+    await this.recordEvent(req.requester, 'tests_run', {
+      questionId: req.questionId,
+      language: req.language,
+      passed: full.passed,
+      total: full.total,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rubric (private document)
+  // ---------------------------------------------------------------------------
+
+  private async persistRubric() {
+    const entries = [...getRubric(this.document).entries()];
+    if (!entries.length) return;
+    const roomId = this.roomId;
+    await this.withDb(async (db) => {
+      for (const [criterion, entry] of entries) {
+        const score =
+          typeof entry.score === 'number' && entry.score >= 1 && entry.score <= 4
+            ? entry.score
+            : null;
+        const comment = typeof entry.comment === 'string' ? entry.comment.slice(0, 2000) : '';
+        await db
+          .insert(rubricScores)
+          .values({ roomId, roundNumber: 1, criterion: criterion.slice(0, 120), score, comment })
+          .onConflictDoUpdate({
+            target: [rubricScores.roomId, rubricScores.roundNumber, rubricScores.criterion],
+            set: { score, comment },
+          });
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persistence
+  // ---------------------------------------------------------------------------
 
   /** Writes buffered updates, merging consecutive ones from the same person into one row. */
   private flush(): void {
@@ -308,7 +596,7 @@ export class Room extends YServer {
   // ---------------------------------------------------------------------------
 
   private async recordEvent(
-    info: ConnectionInfo,
+    actor: Actor,
     type: EventType,
     payload: Record<string, unknown>,
   ): Promise<void> {
@@ -317,16 +605,18 @@ export class Room extends YServer {
     const event: RoomEvent = {
       id: `${serverTs}-${crypto.randomUUID().slice(0, 8)}`,
       type,
-      participantId: info.participantId,
+      participantId: actor.participantId,
       payload,
       serverTs,
     };
-    // Only interviewer-visible events would need per-connection filtering; none exist yet.
-    if (visibility === 'all') this.broadcastMessage({ kind: 'event', event });
+    // Everyone on the private document is an interviewer; on the shared one, only events
+    // visible to all are broadcast.
+    if (visibility === 'all' || this.part === 'private')
+      this.broadcastMessage({ kind: 'event', event });
     await this.withDb((db) =>
       db.insert(events).values({
-        roomId: info.roomId,
-        participantId: info.participantId,
+        roomId: actor.roomId,
+        participantId: actor.participantId,
         type,
         payload,
         visibility,
@@ -402,9 +692,12 @@ export class Room extends YServer {
     this.broadcastCustomMessage(JSON.stringify(message));
   }
 
+  private send(connection: Connection, message: ServerMessage): void {
+    this.sendCustomMessage(connection, JSON.stringify(message));
+  }
+
   private sendError(connection: Connection, code: string, message: string): void {
-    const payload: ServerMessage = { kind: 'error', code, message };
-    this.sendCustomMessage(connection, JSON.stringify(payload));
+    this.send(connection, { kind: 'error', code, message });
   }
 
   private connectionsOf(participantId: string, excludeId: string): number {
@@ -421,16 +714,21 @@ export class Room extends YServer {
     return n;
   }
 
-  private async withDb(fn: (db: Database) => Promise<unknown>): Promise<void> {
+  private async queryDb<T>(fn: (db: Database) => Promise<T>): Promise<T | null> {
     try {
       const handle = await connectDb(this.env.HYPERDRIVE.connectionString);
       try {
-        await fn(handle.db);
+        return await fn(handle.db);
       } finally {
         await handle.close();
       }
     } catch (err) {
-      console.error('Room database write failed', err);
+      console.error('Room database query failed', err);
+      return null;
     }
+  }
+
+  private async withDb(fn: (db: Database) => Promise<unknown>): Promise<void> {
+    await this.queryDb(fn);
   }
 }

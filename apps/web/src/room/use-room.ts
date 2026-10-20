@@ -5,9 +5,11 @@ import {
   type PresenceState,
   type Room,
   type RoomEvent,
+  type ServerMessage,
   type SharedRun,
+  type TestRun,
 } from '@sidebyside/shared';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import YProvider from 'y-partyserver/provider';
 import * as Y from 'yjs';
 import { getGuestToken } from '@/lib/guest-tokens';
@@ -34,7 +36,19 @@ export interface RoomConnection {
   setTab: (tab: PresenceState['tab']) => void;
   /** Shows a run immediately, before (or without) the server echoing it back. */
   showRun: (run: SharedRun) => void;
+  /** The interviewer has made the room read-only for candidates. */
+  locked: boolean;
+  lastTestRun: TestRun | null;
+  /** The test run this browser asked for and is waiting on, if any. */
+  pendingTestRequest: string | null;
+  testError: string | null;
+  requestTests: (questionId: string, language: TestRun['language']) => void;
+  /** Interviewers: called when the room asks this browser to run tests. */
+  onTestsRequested: (handler: TestsRequestedHandler | null) => void;
 }
+
+export type TestsRequest = Extract<ServerMessage, { kind: 'tests_requested' }>;
+export type TestsRequestedHandler = (request: TestsRequest) => void;
 
 function useOnline(): boolean {
   return useSyncExternalStore(
@@ -68,6 +82,11 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
   const [events, setEvents] = useState<RoomEvent[]>([]);
   const [ended, setEnded] = useState(room.status === 'ended');
   const [serverError, setServerError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [lastTestRun, setLastTestRun] = useState<TestRun | null>(null);
+  const [pendingTestRequest, setPendingTestRequest] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const testsHandler = useRef<TestsRequestedHandler | null>(null);
   const online = useOnline();
 
   useEffect(() => {
@@ -117,14 +136,35 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
       const msg = serverMessageSchema.safeParse(parsed);
       if (!msg.success) return;
       const m = msg.data;
-      if (m.kind === 'run_result') setLastRun(m.run);
-      else if (m.kind === 'event') setEvents((prev) => [...prev.slice(-199), m.event]);
-      else if (m.kind === 'session_ended') {
-        setEnded(true);
-        provider.disconnect();
-      } else {
-        setServerError(m.message);
-        setTimeout(() => setServerError(null), 5000);
+      switch (m.kind) {
+        case 'run_result':
+          setLastRun(m.run);
+          break;
+        case 'event':
+          setEvents((prev) => [...prev.slice(-199), m.event]);
+          break;
+        case 'session_ended':
+          setEnded(true);
+          provider.disconnect();
+          break;
+        case 'lock_state':
+          setLocked(m.locked);
+          break;
+        case 'tests_requested':
+          testsHandler.current?.(m);
+          break;
+        case 'tests_result':
+          setLastTestRun(m.run);
+          setPendingTestRequest((cur) => (cur === m.run.requestId ? null : cur));
+          break;
+        case 'tests_failed':
+          setPendingTestRequest((cur) => (cur === m.requestId ? null : cur));
+          setTestError(m.message);
+          break;
+        case 'error':
+          setServerError(m.message);
+          setTimeout(() => setServerError(null), 5000);
+          break;
       }
     };
     const onClose = (event: CloseEvent) => {
@@ -148,7 +188,6 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
     provider.awareness.setLocalStateField('tab', 'discuss');
     void provider.connect();
     // The provider is created here and destroyed by this cleanup, so it cannot come from render.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLive({ doc, provider });
 
     return () => {
@@ -189,5 +228,30 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
     },
     setTab: (tab) => provider.awareness.setLocalStateField('tab', tab),
     showRun: (run) => setLastRun(run),
+    locked,
+    lastTestRun,
+    pendingTestRequest,
+    testError,
+    requestTests: (questionId, language) => {
+      const requestId = crypto.randomUUID();
+      setTestError(null);
+      if (!provider.wsconnected) {
+        setTestError('You are offline; tests run once you reconnect.');
+        return;
+      }
+      setPendingTestRequest(requestId);
+      provider.sendMessage(JSON.stringify({ kind: 'run_tests', requestId, questionId, language }));
+      // The room gives up after two minutes; don't spin forever if its answer is lost.
+      setTimeout(() => {
+        setPendingTestRequest((cur) => {
+          if (cur !== requestId) return cur;
+          queueMicrotask(() => setTestError('No answer from the test run. Try again.'));
+          return null;
+        });
+      }, 130_000);
+    },
+    onTestsRequested: (handler) => {
+      testsHandler.current = handler;
+    },
   };
 }

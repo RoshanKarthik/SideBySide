@@ -6,14 +6,34 @@ import {
   type Lang,
   type Participant,
   type SharedRun,
+  type TestRun,
 } from '@sidebyside/shared';
-import { getCodeMap, getMeta, getStdin, readActiveLanguage } from '@sidebyside/shared/doc';
-import { ChevronDown, ChevronUp, Loader2, Play } from 'lucide-react';
+import {
+  getCodeMap,
+  getMeta,
+  getStdin,
+  readActiveLanguage,
+  readProblem,
+} from '@sidebyside/shared/doc';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  FlaskConical,
+  Loader2,
+  Lock,
+  LockOpen,
+  Play,
+  XCircle,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MonacoBinding } from 'y-monaco';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/card';
 import { NativeSelect, Textarea } from '@/components/ui/form';
+import { useDocVersion } from '@/lib/use-doc';
 import { cn } from '@/lib/utils';
+import { ProblemPanel } from '@/room/problem-panel';
 import type { RoomConnection } from '@/room/use-room';
 import { CodeRunner, type RunPhase } from '@/runner/runner';
 import { monaco } from './monaco';
@@ -24,27 +44,20 @@ function monacoTheme(): string {
   return document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs';
 }
 
-/** Tracks the room's active language, which everyone shares. */
-function useActiveLanguage(conn: RoomConnection): Lang {
-  const [lang, setLang] = useState<Lang>(() => readActiveLanguage(conn.doc));
-  useEffect(() => {
-    const meta = getMeta(conn.doc);
-    const update = () => setLang(readActiveLanguage(conn.doc));
-    update();
-    meta.observe(update);
-    return () => meta.unobserve(update);
-  }, [conn.doc, conn.synced]);
-  return lang;
-}
-
 export default function CodePanel({
   conn,
   participant,
+  interviewer,
 }: {
   conn: RoomConnection;
   participant: Participant;
+  interviewer: boolean;
 }) {
-  const language = useActiveLanguage(conn);
+  useDocVersion(conn.doc);
+  const language = readActiveLanguage(conn.doc);
+  // Candidates can't type while the interviewer has locked the editor (the server also
+  // refuses their edits).
+  const readOnly = conn.locked && !interviewer;
   const [editor, setEditor] = useState<monaco.editor.IStandaloneCodeEditor | null>(null);
 
   // One editor instance, created when its container mounts; one model per language so
@@ -93,6 +106,13 @@ export default function CodePanel({
     };
   }, [editor, conn.doc, conn.provider, conn.synced, language]);
 
+  useEffect(() => {
+    editor?.updateOptions({
+      readOnly,
+      readOnlyMessage: { value: 'The interviewer has locked the editor.' },
+    });
+  }, [editor, readOnly]);
+
   const cursorCss = useMemo(
     () => remoteCursorCss(conn.peers, conn.doc.clientID),
     [conn.peers, conn.doc.clientID],
@@ -110,6 +130,7 @@ export default function CodePanel({
   return (
     <div className="flex h-full flex-col">
       <style>{cursorCss}</style>
+      <ProblemPanel doc={conn.doc} />
       <div className="flex flex-wrap items-center gap-2 border-b px-3 py-1.5">
         <label htmlFor="language" className="sr-only">
           Language
@@ -118,6 +139,7 @@ export default function CodePanel({
           id="language"
           value={language}
           onChange={(e) => changeLanguage(e.target.value as Lang)}
+          disabled={readOnly}
           className="h-8"
         >
           {LANGUAGES.map((l) => (
@@ -127,13 +149,36 @@ export default function CodePanel({
             </option>
           ))}
         </NativeSelect>
+        {interviewer ? (
+          <Button
+            size="sm"
+            variant="outline"
+            aria-pressed={conn.locked}
+            onClick={() => conn.send({ kind: 'set_lock', locked: !conn.locked })}
+            title={
+              conn.locked
+                ? 'Let the candidate edit again'
+                : 'Make the room read-only for the candidate'
+            }
+          >
+            {conn.locked ? <Lock /> : <LockOpen />}
+            {conn.locked ? 'Locked' : 'Lock editor'}
+          </Button>
+        ) : (
+          conn.locked && (
+            <Badge tone="info">
+              <Lock className="size-3" /> Locked by the interviewer
+            </Badge>
+          )
+        )}
         <span className="flex-1" />
+        <RunTestsButton conn={conn} language={language} />
         <RunControls conn={conn} participant={participant} language={language} />
       </div>
       <div className="relative min-h-0 flex-1">
         <div ref={hostRef} className="absolute inset-0" aria-label="Code editor" />
       </div>
-      <OutputDrawer conn={conn} />
+      <OutputDrawer conn={conn} readOnly={readOnly} />
     </div>
   );
 }
@@ -203,6 +248,29 @@ function RunControls({
   );
 }
 
+function RunTestsButton({ conn, language }: { conn: RoomConnection; language: Lang }) {
+  const problem = readProblem(conn.doc);
+  if (!problem) return null;
+  const runnable = isRunnable(language);
+  const pending = conn.pendingTestRequest !== null;
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={!runnable || pending}
+      onClick={() => conn.requestTests(problem.questionId, language)}
+      title={
+        runnable
+          ? 'Run the question’s tests, including hidden ones'
+          : 'Tests can only run for Python, JavaScript and TypeScript'
+      }
+    >
+      {pending ? <Loader2 className="animate-spin" /> : <FlaskConical />}
+      {pending ? 'Testing…' : 'Run tests'}
+    </Button>
+  );
+}
+
 function localRun(
   participant: Participant,
   language: Lang,
@@ -224,38 +292,52 @@ function localRun(
   };
 }
 
-function OutputDrawer({ conn }: { conn: RoomConnection }) {
+type DrawerTab = 'output' | 'tests' | 'stdin';
+const DRAWER_TABS: { id: DrawerTab; label: string }[] = [
+  { id: 'output', label: 'Output' },
+  { id: 'tests', label: 'Tests' },
+  { id: 'stdin', label: 'Input (stdin)' },
+];
+
+function OutputDrawer({ conn, readOnly }: { conn: RoomConnection; readOnly: boolean }) {
   const [open, setOpen] = useState(true);
-  const [tab, setTab] = useState<'output' | 'stdin'>('output');
+  const [tab, setTab] = useState<DrawerTab>('output');
   const run = conn.lastRun;
-  // A new run (from anyone) brings the output into view.
+  const testRun = conn.lastTestRun;
+  // A new run or test run (from anyone) brings its results into view.
   const [shownRunId, setShownRunId] = useState(run?.runId);
   if (run && run.runId !== shownRunId) {
     setShownRunId(run.runId);
     setOpen(true);
     setTab('output');
   }
+  const [shownTestId, setShownTestId] = useState(testRun?.requestId);
+  if (testRun && testRun.requestId !== shownTestId) {
+    setShownTestId(testRun.requestId);
+    setOpen(true);
+    setTab('tests');
+  }
 
   return (
     <div className="border-t">
       <div className="flex items-center gap-1 px-2">
-        {(['output', 'stdin'] as const).map((t) => (
+        {DRAWER_TABS.map((t) => (
           <button
-            key={t}
+            key={t.id}
             type="button"
             onClick={() => {
-              setTab(t);
+              setTab(t.id);
               setOpen(true);
             }}
             className={cn(
               'px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground',
-              open && tab === t && 'text-foreground',
+              open && tab === t.id && 'text-foreground',
             )}
           >
-            {t === 'output' ? 'Output' : 'Input (stdin)'}
+            {t.label}
           </button>
         ))}
-        {run && (
+        {tab === 'output' && run && (
           <span className="ml-2 truncate text-xs text-muted-foreground">
             {run.displayName} ran {LANGUAGE_INFO[run.language].label} ·{' '}
             <span className={run.status === 'ok' ? 'text-success' : 'text-destructive'}>
@@ -275,9 +357,15 @@ function OutputDrawer({ conn }: { conn: RoomConnection }) {
         </button>
       </div>
       {open && (
-        <div className="h-44 overflow-auto border-t bg-muted/40">
+        <div className="h-48 overflow-auto border-t bg-muted/40">
           {tab === 'stdin' ? (
-            <StdinEditor conn={conn} />
+            <StdinEditor conn={conn} readOnly={readOnly} />
+          ) : tab === 'tests' ? (
+            <TestResults
+              run={testRun}
+              pending={conn.pendingTestRequest !== null}
+              error={conn.testError}
+            />
           ) : run ? (
             <pre className="p-3 font-mono text-[13px] leading-relaxed whitespace-pre-wrap">
               {run.stdout}
@@ -297,21 +385,101 @@ function OutputDrawer({ conn }: { conn: RoomConnection }) {
   );
 }
 
-function StdinEditor({ conn }: { conn: RoomConnection }) {
+function TestResults({
+  run,
+  pending,
+  error,
+}: {
+  run: TestRun | null;
+  pending: boolean;
+  error: string | null;
+}) {
+  if (pending) {
+    return (
+      <p className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" /> Running the tests in the interviewer’s browser…
+      </p>
+    );
+  }
+  if (error && !run) return <p className="p-3 text-sm text-destructive">{error}</p>;
+  if (!run) {
+    return (
+      <p className="p-3 text-sm text-muted-foreground">
+        Run the tests to check the solution against the question’s test cases.
+      </p>
+    );
+  }
+  const allPassed = run.passed === run.total;
+  return (
+    <div className="p-3 text-sm">
+      {error && <p className="mb-2 text-destructive">{error}</p>}
+      <p className={cn('font-medium', allPassed ? 'text-success' : 'text-destructive')}>
+        {run.passed} / {run.total} tests passed
+        <span className="ml-2 font-normal text-muted-foreground">
+          {LANGUAGE_INFO[run.language].label} · requested by {run.requestedBy}
+        </span>
+      </p>
+      <ul className="mt-2 space-y-1">
+        {run.results.map((r) => (
+          <li key={r.index} className="rounded-md border bg-background px-2 py-1.5">
+            <details>
+              <summary className="flex cursor-pointer items-center gap-2">
+                {r.status === 'passed' ? (
+                  <CheckCircle2 className="size-4 text-success" />
+                ) : (
+                  <XCircle className="size-4 text-destructive" />
+                )}
+                Test {r.index + 1}
+                {r.hidden && <Badge>hidden</Badge>}
+                <span className="text-muted-foreground">
+                  {r.status} · {r.timeMs} ms
+                </span>
+              </summary>
+              {r.stdin !== undefined ? (
+                <div className="mt-2 grid gap-2 font-mono text-xs sm:grid-cols-3">
+                  <IoBlock label="Input" text={r.stdin} />
+                  <IoBlock label="Expected" text={r.expectedStdout ?? ''} />
+                  <IoBlock
+                    label="Actual"
+                    text={(r.actualStdout ?? '') + (r.stderr ? `\n${r.stderr}` : '')}
+                  />
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Hidden test: its input and expected output are not shown.
+                </p>
+              )}
+            </details>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function IoBlock({ label, text }: { label: string; text: string }) {
+  return (
+    <div>
+      <p className="mb-1 font-sans text-[11px] font-medium text-muted-foreground uppercase">
+        {label}
+      </p>
+      <pre className="max-h-32 overflow-auto rounded bg-muted p-2 whitespace-pre-wrap">
+        {text === '' ? '(empty)' : text}
+      </pre>
+    </div>
+  );
+}
+
+function StdinEditor({ conn, readOnly }: { conn: RoomConnection; readOnly: boolean }) {
   const ytext = getStdin(conn.doc);
-  const [value, setValue] = useState(() => ytext.toString());
-  useEffect(() => {
-    const update = () => setValue(ytext.toString());
-    ytext.observe(update);
-    update();
-    return () => ytext.unobserve(update);
-  }, [ytext]);
+  useDocVersion(conn.doc);
   return (
     <Textarea
       aria-label="Program input"
-      value={value}
+      value={ytext.toString()}
       placeholder="Input passed to the program on stdin"
       maxLength={LIMITS.stdinBytes}
+      readOnly={readOnly}
       onChange={(e) => applyTextDiff(ytext, e.target.value)}
       className="h-full resize-none rounded-none border-0 bg-transparent"
     />

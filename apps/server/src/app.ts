@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import { meRoutes } from './api/me';
+import { questionRoutes } from './api/questions';
+import { roomToolRoutes } from './api/room-tools';
 import { roomRoutes } from './api/rooms';
 import { allowedOrigins, createAuth } from './auth/auth';
 import type { AppDeps, AppEnv } from './context';
@@ -56,6 +58,8 @@ export function createApp(deps: AppDeps) {
 
   app.route('/', meRoutes());
   app.route('/', roomRoutes(deps));
+  app.route('/', roomToolRoutes(deps));
+  app.route('/', questionRoutes());
 
   return app;
 }

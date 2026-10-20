@@ -4,6 +4,7 @@ import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extensions';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
+import { useEffect } from 'react';
 import StarterKit from '@tiptap/starter-kit';
 import {
   Bold,
@@ -49,6 +50,10 @@ export function NotesEditor({ doc, provider, user, editable }: Props) {
     },
     [doc, provider],
   );
+
+  useEffect(() => {
+    editor?.setEditable(editable);
+  }, [editor, editable]);
 
   return (
     <div className="flex h-full flex-col">

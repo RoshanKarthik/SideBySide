@@ -1,6 +1,6 @@
 import { isInterviewerRole, type JoinRoomResponse, type PresenceState } from '@sidebyside/shared';
 import { useMutation } from '@tanstack/react-query';
-import { Code2, NotebookPen, PenTool } from 'lucide-react';
+import { Code2, NotebookPen, PanelRight, PenTool, X } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Logo, ThemeToggle } from '@/components/layout';
@@ -9,8 +9,11 @@ import { ErrorNote, Spinner } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { cn, colorFor } from '@/lib/utils';
 import { NotesEditor } from '@/notes/notes-editor';
+import { InterviewerPanel } from './interviewer-panel';
 import { ConnectionIndicator, PresenceAvatars, SessionTimer } from './top-bar';
+import { usePrivateDoc } from './use-private-doc';
 import { useRoom } from './use-room';
+import { useTestHost } from './use-test-host';
 
 // Monaco is large; it loads the first time someone opens the Code tab.
 const CodePanel = lazy(() => import('@/editor/code-panel'));
@@ -28,6 +31,9 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
   const [tab, setTab] = useState<Tab>('discuss');
   const [codeOpened, setCodeOpened] = useState(false);
   const interviewer = isInterviewerRole(participant.role);
+  const privateDoc = usePrivateDoc(room, interviewer);
+  const runningTestsFor = useTestHost(conn, room, slug, interviewer);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [startedAt] = useState(() => (room.startedAt ? Date.parse(room.startedAt) : Date.now()));
 
   const end = useMutation({
@@ -90,6 +96,17 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
             End session
           </Button>
         )}
+        {interviewer && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="lg:hidden"
+            aria-expanded={panelOpen}
+            onClick={() => setPanelOpen(true)}
+          >
+            <PanelRight /> Panel
+          </Button>
+        )}
         <ThemeToggle />
       </header>
 
@@ -123,31 +140,76 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
         </div>
       )}
 
-      <main className="relative min-h-0 flex-1">
-        {!conn.synced && (
-          <div className="absolute inset-x-0 top-0 z-10 flex justify-center p-2">
-            <span className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-              <Spinner className="size-3" /> Syncing the room…
-            </span>
-          </div>
-        )}
-        <section role="tabpanel" hidden={tab !== 'discuss'} className="h-full">
-          <NotesEditor doc={conn.doc} provider={conn.provider} user={user} editable />
-        </section>
-        {codeOpened && (
-          <section role="tabpanel" hidden={tab !== 'code'} className="h-full">
-            <Suspense
-              fallback={
-                <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Spinner /> Loading the editor…
-                </div>
-              }
-            >
-              <CodePanel conn={conn} participant={participant} />
-            </Suspense>
+      <div className="flex min-h-0 flex-1">
+        <main className="relative min-w-0 flex-1">
+          {!conn.synced && (
+            <div className="absolute inset-x-0 top-0 z-10 flex justify-center p-2">
+              <span className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                <Spinner className="size-3" /> Syncing the room…
+              </span>
+            </div>
+          )}
+          <section role="tabpanel" hidden={tab !== 'discuss'} className="h-full">
+            <NotesEditor
+              doc={conn.doc}
+              provider={conn.provider}
+              user={user}
+              editable={interviewer || !conn.locked}
+            />
           </section>
+          {codeOpened && (
+            <section role="tabpanel" hidden={tab !== 'code'} className="h-full">
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Spinner /> Loading the editor…
+                  </div>
+                }
+              >
+                <CodePanel conn={conn} participant={participant} interviewer={interviewer} />
+              </Suspense>
+            </section>
+          )}
+        </main>
+        {interviewer && (
+          <>
+            {panelOpen && (
+              <div
+                className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+                onClick={() => setPanelOpen(false)}
+                aria-hidden
+              />
+            )}
+            <aside
+              aria-label="Interviewer panel"
+              className={cn(
+                'fixed inset-y-0 right-0 z-40 w-[22rem] max-w-full border-l bg-background transition-transform lg:static lg:z-auto lg:translate-x-0',
+                panelOpen ? 'translate-x-0' : 'translate-x-full',
+              )}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-1.5 right-1.5 z-10 lg:hidden"
+                aria-label="Close panel"
+                onClick={() => setPanelOpen(false)}
+              >
+                <X />
+              </Button>
+              <InterviewerPanel
+                room={room}
+                slug={slug}
+                conn={conn}
+                privateDoc={privateDoc}
+                isOwner={participant.role === 'owner'}
+                user={user}
+                sessionStart={startedAt}
+                runningTestsFor={runningTestsFor}
+              />
+            </aside>
+          </>
         )}
-      </main>
+      </div>
     </div>
   );
 }
