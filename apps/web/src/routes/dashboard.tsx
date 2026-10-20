@@ -9,7 +9,7 @@ import {
   type RoomListItem,
 } from '@sidebyside/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, Plus, X } from 'lucide-react';
+import { BookOpen, Check, Copy, Plus, X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router';
@@ -45,7 +45,14 @@ export function DashboardPage() {
             <h1 className="text-2xl font-bold">Your rooms</h1>
             <p className="text-sm text-muted-foreground">Create a room and send the link.</p>
           </div>
-          <NewRoomDialog />
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/questions">
+                <BookOpen /> Question bank
+              </Link>
+            </Button>
+            <NewRoomDialog />
+          </div>
         </div>
         {rooms.isPending && <Spinner className="mt-10" />}
         {rooms.error && <ErrorNote>{rooms.error.message}</ErrorNote>}

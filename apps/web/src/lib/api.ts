@@ -50,6 +50,10 @@ export const api = {
   async json<T>(path: string, opts?: RequestOptions): Promise<T> {
     return (await request(path, opts)).json() as Promise<T>;
   },
+  /** For requests whose response has no body (e.g. 204). */
+  async send(path: string, opts?: RequestOptions): Promise<void> {
+    await request(path, opts);
+  },
   async bytes(path: string, opts?: RequestOptions): Promise<Uint8Array> {
     return new Uint8Array(await (await request(path, opts)).arrayBuffer());
   },

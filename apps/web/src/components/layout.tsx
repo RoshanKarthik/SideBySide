@@ -42,6 +42,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Button variant="ghost" size="sm" asChild>
                   <Link to="/dashboard">Dashboard</Link>
                 </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/questions">Questions</Link>
+                </Button>
                 <span className="hidden px-2 text-sm text-muted-foreground sm:inline">
                   {session.user.name}
                 </span>

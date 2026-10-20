@@ -14,6 +14,8 @@ import './index.css';
 // The room and replay pages pull in the editors; load them only when needed.
 const RoomRoute = lazy(() => import('@/routes/room-route'));
 const ReplayPage = lazy(() => import('@/routes/replay'));
+const QuestionsPage = lazy(() => import('@/routes/questions'));
+const QuestionEditPage = lazy(() => import('@/routes/question-edit'));
 
 function PageLoader() {
   return (
@@ -50,6 +52,22 @@ const router = createBrowserRouter([
     element: (
       <Suspense fallback={<PageLoader />}>
         <ReplayPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/questions',
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <QuestionsPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/questions/:id',
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <QuestionEditPage />
       </Suspense>
     ),
   },
