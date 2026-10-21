@@ -3,6 +3,7 @@ import { ArrowRight, FlaskConical } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
 import { AuthLayout, GitHubIcon, GoogleIcon } from '@/components/marketing/auth-layout';
+import { coverScreen, openScreen } from '@/components/sign-in-curtain';
 import { Button } from '@/components/ui/button';
 import { ErrorNote, Skeleton, Spinner } from '@/components/ui/card';
 import { Field, Input } from '@/components/ui/form';
@@ -30,8 +31,10 @@ export default function LoginPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  // While the sign-in curtain plays, the page loads the next one itself.
+  const [leaving, setLeaving] = useState(false);
 
-  if (session) return <Navigate to={next} replace />;
+  if (session && !leaving) return <Navigate to={next} replace />;
 
   const social = providers.data?.providers.filter((p) => p !== 'dev') ?? [];
   const devLogin = providers.data?.providers.includes('dev') ?? false;
@@ -65,11 +68,15 @@ export default function LoginPage() {
               size="lg"
               className="w-full"
               disabled={pending !== null}
-              onClick={async () => {
+              onClick={async (e) => {
                 setError(null);
                 setPending(p);
+                // The curtain covers the screen while the browser heads to the provider, and
+                // opens on the page it comes back to.
+                void coverScreen(e.currentTarget, 'Signing you in…');
                 const res = await authClient.signIn.social({ provider: p, callbackURL: next });
                 if (res.error) {
+                  openScreen();
                   setPending(null);
                   setError(res.error.message ?? 'Sign-in failed');
                 }
@@ -88,6 +95,7 @@ export default function LoginPage() {
             next={next}
             initialMode={signUp ? 'signUp' : 'signIn'}
             onError={setError}
+            onLeaving={setLeaving}
             hasSocial={social.length > 0}
           />
         )}
@@ -102,11 +110,13 @@ function DevLogin({
   initialMode,
   hasSocial,
   onError,
+  onLeaving,
 }: {
   next: string;
   initialMode: 'signIn' | 'signUp';
   hasSocial: boolean;
   onError: (e: string | null) => void;
+  onLeaving: (leaving: boolean) => void;
 }) {
   const [mode, setMode] = useState(initialMode);
   const [busy, setBusy] = useState(false);
@@ -116,15 +126,22 @@ function DevLogin({
     const form = new FormData(e.currentTarget);
     const email = String(form.get('email'));
     const password = String(form.get('password'));
+    const button = (e.nativeEvent as SubmitEvent).submitter;
     onError(null);
     setBusy(true);
+    onLeaving(true);
     const res =
       mode === 'signUp'
         ? await authClient.signUp.email({ email, password, name: String(form.get('name')) })
         : await authClient.signIn.email({ email, password });
-    setBusy(false);
-    if (res.error) onError(res.error.message ?? 'Sign-in failed');
-    else window.location.assign(next);
+    if (res.error) {
+      setBusy(false);
+      onLeaving(false);
+      onError(res.error.message ?? 'Sign-in failed');
+      return;
+    }
+    await coverScreen(button, mode === 'signUp' ? 'Setting up your account…' : 'Signing you in…');
+    window.location.assign(next);
   }
 
   return (

@@ -14,6 +14,7 @@ import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
 import { Link, NavLink, useNavigate } from '@/lib/navigation';
 import { CommandPalette, useCommandPalette } from '@/components/command-palette';
+import { coverScreen } from '@/components/sign-in-curtain';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/card';
 import {
@@ -191,7 +192,7 @@ function SignedInShell({
             <Search />
           </Button>
         </header>
-        <main className="flex-1">{children}</main>
+        <main className="page-enter flex-1">{children}</main>
       </div>
       <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
     </div>
@@ -231,9 +232,11 @@ function UserMenu({
         </MenuItem>
         <MenuSeparator />
         <MenuItem
-          onSelect={async () => {
+          onSelect={async (e) => {
+            // The curtain closes over the app and opens again on the home page.
+            await coverScreen(e.target as Element, 'Signing you out…');
             await signOut();
-            navigate('/');
+            window.location.assign('/');
           }}
         >
           <LogOut /> Sign out
@@ -279,10 +282,13 @@ export function MarketingShell({
   children,
   bare = false,
   revealHeaderAfter,
+  animate = true,
 }: {
   children: ReactNode;
   bare?: boolean;
   revealHeaderAfter?: string;
+  /** Rise the page in on arrival (the landing page animates its own sections instead). */
+  animate?: boolean;
 }) {
   const { data: session } = useSession();
   const showHeader = useScrolledPast(revealHeaderAfter);
@@ -333,7 +339,7 @@ export function MarketingShell({
           </div>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main className={cn('flex-1', animate && 'page-enter')}>{children}</main>
       <SiteFooter />
     </div>
   );

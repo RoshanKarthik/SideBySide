@@ -35,7 +35,7 @@ export function AuthLayout({
           <ThemeToggle />
         </div>
         <div className="flex flex-1 items-center justify-center py-12">
-          <div className="w-full max-w-sm animate-fade-up">{children}</div>
+          <div className="auth-enter w-full max-w-sm">{children}</div>
         </div>
         <p className="text-center text-xs text-muted-foreground">
           By continuing you agree to the{' '}
@@ -53,7 +53,7 @@ export function AuthLayout({
       <div className="cinematic relative isolate hidden overflow-hidden lg:flex lg:flex-col lg:justify-center lg:px-14">
         <BackgroundVideo />
         <div aria-hidden className="absolute inset-0 z-0 bg-[hsl(201_100%_13%/0.35)]" />
-        <div className="relative z-10">
+        <div className="auth-float relative z-10">
           {aside ?? (
             <div className="mx-auto w-full max-w-lg">
               <RoomPreview className="border-white/15 bg-black/35 backdrop-blur-md" />

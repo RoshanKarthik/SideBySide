@@ -17,7 +17,30 @@
         dark = localStorage.getItem('sbs-theme') === 'dark';
       } catch {}
       if (dark) document.documentElement.classList.add('dark');
+      // Mid sign-in (or sign-out): paint navy from the first frame, so the page load under the
+      // curtain never flashes white (see components/sign-in-curtain.tsx).
+      try {
+        if (sessionStorage.getItem('sbs-curtain')) {
+          document.documentElement.classList.add('curtain-pending');
+        }
+      } catch {}
     </script>
+    <style>
+      html.curtain-pending,
+      html.curtain-pending body {
+        background: hsl(201 100% 11%) !important;
+      }
+      html.curtain-pending #root {
+        visibility: hidden;
+        /* Never stay hidden, even if the app fails to start. */
+        animation: curtain-unhide 0s 4s forwards;
+      }
+      @keyframes curtain-unhide {
+        to {
+          visibility: visible;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

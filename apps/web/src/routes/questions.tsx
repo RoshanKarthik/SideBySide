@@ -118,7 +118,7 @@ export default function QuestionsPage() {
               : 'No questions match.'}
           </Card>
         )}
-        <ul className="mt-6 grid gap-2">
+        <ul className="stagger mt-6 grid gap-2">
           {items.map((item) => (
             <li key={item.id}>
               <QuestionRow item={item} />

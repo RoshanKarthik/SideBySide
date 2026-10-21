@@ -74,7 +74,7 @@ export default function PracticePage() {
           <Waiting status={s} onCancel={() => leave.mutate()} cancelling={leave.isPending} />
         )}
         {s?.status === 'idle' && (
-          <div className="mt-8 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+          <div className="stagger mt-8 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
             <PreferencesCard
               busy={join.isPending}
               error={join.error?.message}

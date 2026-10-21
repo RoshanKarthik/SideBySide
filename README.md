@@ -30,7 +30,8 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
   and search; a command palette (Ctrl+K); settings with company branding (name, logo and colour
   shown to candidates on join pages and in rooms), a low-bandwidth mode, data export and account
   deletion. Light theme by default, dark as an option. The landing page opens with a cinematic
-  video hero, and every page change cross-fades (view transitions).
+  video hero, every page change cross-fades (view transitions), pages rise in on arrival, and
+  signing in or out plays a curtain transition.
 
 ## Stack
 

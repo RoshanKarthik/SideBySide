@@ -121,7 +121,14 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
     // Awareness can change while another component renders (editors set their caret state
     // on creation), so read it after the current render.
     let awarenessQueued = false;
-    const onAwareness = () => {
+    const onAwareness = ({ added }: { added: number[] }) => {
+      // Someone new arrived: announce ourselves again right away. The room forgets presence
+      // when it sleeps between messages, so a newcomer would otherwise not see us until our
+      // next 15-second renewal.
+      if (added.some((id) => id !== doc.clientID)) {
+        const local = provider.awareness.getLocalState();
+        if (local) provider.awareness.setLocalState(local);
+      }
       if (awarenessQueued) return;
       awarenessQueued = true;
       queueMicrotask(readAwareness);

@@ -63,7 +63,7 @@ export function Lobby({
         <BrandMark brand={brand} />
       </header>
       <main className="flex flex-1 items-center justify-center px-4 py-8">
-        <div className="grid w-full max-w-5xl items-center gap-8 lg:grid-cols-[1.4fr_1fr]">
+        <div className="stagger grid w-full max-w-5xl items-center gap-8 lg:grid-cols-[1.4fr_1fr]">
           <div>
             <VideoTile
               stream={media.stream}
