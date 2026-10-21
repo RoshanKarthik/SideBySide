@@ -27,7 +27,8 @@ import {
   Users,
 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
+import { Link, useNavigate } from '@/lib/navigation';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import {

@@ -15,7 +15,8 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, History, Sparkles, Star, Timer, Users, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router';
+import { Navigate } from 'react-router';
+import { Link, useNavigate } from '@/lib/navigation';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import {

@@ -13,7 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link } from '@/lib/navigation';
 import { CallControls, CallDock } from '@/call/call-ui';
 import type { LocalMedia } from '@/call/local-media';
 import { useCall } from '@/call/use-call';

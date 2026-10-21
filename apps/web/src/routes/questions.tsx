@@ -2,7 +2,8 @@ import { DIFFICULTIES, type Question, type QuestionSummary } from '@sidebyside/s
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router';
+import { Navigate } from 'react-router';
+import { Link, useNavigate } from '@/lib/navigation';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, ErrorNote, PageHeader, Skeleton, Spinner } from '@/components/ui/card';

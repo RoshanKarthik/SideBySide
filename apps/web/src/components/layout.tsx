@@ -10,8 +10,9 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useLocation } from 'react-router';
+import { Link, NavLink, useNavigate } from '@/lib/navigation';
 import { CommandPalette, useCommandPalette } from '@/components/command-palette';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/card';
@@ -249,18 +250,53 @@ const PUBLIC_NAV = [
   { href: '/#trust', label: 'Privacy' },
 ];
 
-/** Public pages: a translucent top bar and a footer. */
+/** True once the element with this id has scrolled up out of view (behind a 64 px header). */
+function useScrolledPast(id: string | undefined): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      if (!id) return () => {};
+      window.addEventListener('scroll', cb, { passive: true });
+      window.addEventListener('resize', cb);
+      return () => {
+        window.removeEventListener('scroll', cb);
+        window.removeEventListener('resize', cb);
+      };
+    },
+    () => {
+      if (!id) return true;
+      const el = document.getElementById(id);
+      return !el || el.getBoundingClientRect().bottom <= 64;
+    },
+  );
+}
+
+/**
+ * Public pages: a translucent top bar and a footer. With `revealHeaderAfter`, the bar stays
+ * out of the way while that section (the landing hero, which has its own navigation) is on
+ * screen, and slides in once it scrolls away.
+ */
 export function MarketingShell({
   children,
   bare = false,
+  revealHeaderAfter,
 }: {
   children: ReactNode;
   bare?: boolean;
+  revealHeaderAfter?: string;
 }) {
   const { data: session } = useSession();
+  const showHeader = useScrolledPast(revealHeaderAfter);
   return (
     <div className="flex min-h-full flex-col">
-      <header className="glass sticky top-0 z-30 border-b">
+      <header
+        className={cn(
+          'glass top-0 z-30 border-b transition-[transform,opacity] duration-300',
+          revealHeaderAfter ? 'fixed inset-x-0' : 'sticky',
+          !showHeader && '-translate-y-full opacity-0',
+        )}
+        aria-hidden={!showHeader || undefined}
+        inert={!showHeader || undefined}
+      >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Logo />
           {!bare && (

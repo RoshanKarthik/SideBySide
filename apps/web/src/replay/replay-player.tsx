@@ -30,7 +30,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link } from '@/lib/navigation';
 import type * as Y from 'yjs';
 import { LogoMark, ThemeToggle } from '@/components/layout';
 import { Button } from '@/components/ui/button';

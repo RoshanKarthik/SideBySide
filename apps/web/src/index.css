@@ -10,6 +10,8 @@
  */
 :root {
   --background: oklch(0.982 0.003 255);
+  /* The page's own background, kept when a section (the cinematic hero) restyles --background. */
+  --page-background: oklch(0.982 0.003 255);
   --foreground: oklch(0.22 0.02 260);
   --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
@@ -40,6 +42,7 @@
 
 .dark {
   --background: oklch(0.135 0.006 275);
+  --page-background: oklch(0.135 0.006 275);
   --foreground: oklch(0.96 0.004 270);
   --card: oklch(0.17 0.007 275);
   --card-foreground: var(--foreground);
@@ -420,9 +423,31 @@
   padding: 0.25rem 0.5rem;
 }
 
-/* Route changes cross-fade where the browser supports view transitions. */
-::view-transition-old(root),
+/*
+ * Page changes (and the theme switch, and lobby to room) cross-fade where the browser supports
+ * view transitions: the old page fades out while the new one fades in and settles into place.
+ */
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+::view-transition-old(root) {
+  animation: 0.22s cubic-bezier(0.4, 0, 1, 1) both page-out;
+}
 ::view-transition-new(root) {
-  animation-duration: 0.35s;
-  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  animation: 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) 0.06s both page-in;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

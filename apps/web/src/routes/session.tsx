@@ -20,7 +20,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
+import { Link, useNavigate } from '@/lib/navigation';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, ErrorNote, Skeleton, Spinner } from '@/components/ui/card';

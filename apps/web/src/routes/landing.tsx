@@ -13,13 +13,13 @@ import {
   ShieldCheck,
   Timer,
   Trash2,
-  Users,
   Video,
   type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link } from '@/lib/navigation';
 import { MarketingShell } from '@/components/layout';
+import { CinematicHero } from '@/components/marketing/cinematic-hero';
 import {
   BoardMini,
   BrandMini,
@@ -187,42 +187,32 @@ export default function LandingPage() {
   const practice = session ? '/practice' : '/login?next=/practice';
 
   return (
-    <MarketingShell>
-      {/* Hero */}
-      <section className="relative isolate overflow-hidden border-b">
-        <div className="bg-dots mask-fade-b absolute inset-0 -z-10 opacity-50" />
-        <div className="absolute -top-40 left-1/2 -z-10 h-[28rem] w-[64rem] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,var(--glow),transparent)]" />
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:py-24">
+    <MarketingShell revealHeaderAfter="top">
+      <CinematicHero id="top" />
+
+      {/* The product, up close */}
+      <section className="border-b">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-8 pb-20 sm:px-6 lg:grid-cols-[1fr_1.15fr]">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-card">
-              <span className="size-1.5 rounded-full bg-success" /> Technical interview platform
-            </p>
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-[3.4rem] lg:leading-[1.05]">
-              The whole technical interview, in one link.
-            </h1>
-            <p className="mt-5 max-w-xl text-lg leading-relaxed text-pretty text-muted-foreground">
+            <SectionHeading
+              eyebrow="See it in action"
+              title="The whole technical interview, in one room"
+            >
               Video call, a shared editor that runs code, hidden tests with a score, a whiteboard
               and a private scorecard — with a full replay when you’re done.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button size="lg" variant="glow" asChild>
-                <Link to={start}>
-                  Start an interview <ArrowRight />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link to={practice}>
-                  <Users /> Practise with a peer
-                </Link>
-              </Button>
-            </div>
-            <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+            </SectionHeading>
+            <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
               {['No install for candidates', 'Runs in the browser', 'Free to use'].map((t) => (
                 <li key={t} className="flex items-center gap-1.5">
                   <CheckCircle2 className="size-4 text-success" /> {t}
                 </li>
               ))}
             </ul>
+            <Button size="lg" variant="glow" className="mt-8" asChild>
+              <Link to={start}>
+                Start an interview <ArrowRight />
+              </Link>
+            </Button>
           </div>
           <RoomPreview className="w-full" />
         </div>

@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
+import { withViewTransition } from './navigation';
 
 export type Theme = 'light' | 'dark';
 
@@ -20,7 +21,8 @@ export function useTheme() {
   const theme = useCurrentTheme();
   const toggle = useCallback(() => {
     const next: Theme = current() === 'dark' ? 'light' : 'dark';
-    document.documentElement.classList.toggle('dark', next === 'dark');
+    // Cross-fade between the themes instead of flashing.
+    withViewTransition(() => document.documentElement.classList.toggle('dark', next === 'dark'));
     try {
       localStorage.setItem('sbs-theme', next);
     } catch {

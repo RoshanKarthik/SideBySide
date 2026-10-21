@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link } from '@/lib/navigation';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 

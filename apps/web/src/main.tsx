@@ -46,21 +46,48 @@ const queryClient = new QueryClient({
   },
 });
 
+const pages = {
+  landing: () => import('@/routes/landing'),
+  login: () => import('@/routes/login'),
+  room: () => import('@/routes/room-route'),
+  replay: () => import('@/routes/replay'),
+  questions: () => import('@/routes/questions'),
+  question: () => import('@/routes/question-edit'),
+  session: () => import('@/routes/session'),
+  practice: () => import('@/routes/practice'),
+  settings: () => import('@/routes/settings'),
+};
+
+/**
+ * Fetches the other pages' code once the browser is idle, so moving between pages cross-fades
+ * straight to the new page instead of through a loading spinner. Skipped on Save-Data.
+ */
+function preloadPages() {
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  if (connection?.saveData) return;
+  const idle = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1500));
+  idle(() => {
+    for (const load of Object.values(pages)) void load().catch(() => {});
+  });
+}
+
 const router = createBrowserRouter([
-  { path: '/', element: lazyPage(() => import('@/routes/landing')) },
-  { path: '/login', element: lazyPage(() => import('@/routes/login')) },
+  { path: '/', element: lazyPage(pages.landing) },
+  { path: '/login', element: lazyPage(pages.login) },
   { path: '/dashboard', element: <DashboardPage /> },
-  { path: '/r/:slug', element: lazyPage(() => import('@/routes/room-route')) },
-  { path: '/rooms/:id/replay', element: lazyPage(() => import('@/routes/replay')) },
-  { path: '/questions', element: lazyPage(() => import('@/routes/questions')) },
-  { path: '/questions/:id', element: lazyPage(() => import('@/routes/question-edit')) },
-  { path: '/sessions/:id', element: lazyPage(() => import('@/routes/session')) },
-  { path: '/practice', element: lazyPage(() => import('@/routes/practice')) },
-  { path: '/settings', element: lazyPage(() => import('@/routes/settings')) },
+  { path: '/r/:slug', element: lazyPage(pages.room) },
+  { path: '/rooms/:id/replay', element: lazyPage(pages.replay) },
+  { path: '/questions', element: lazyPage(pages.questions) },
+  { path: '/questions/:id', element: lazyPage(pages.question) },
+  { path: '/sessions/:id', element: lazyPage(pages.session) },
+  { path: '/practice', element: lazyPage(pages.practice) },
+  { path: '/settings', element: lazyPage(pages.settings) },
   { path: '/privacy', element: <PrivacyPage /> },
   { path: '/terms', element: <TermsPage /> },
   { path: '*', element: <NotFoundPage /> },
 ]);
+
+preloadPages();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

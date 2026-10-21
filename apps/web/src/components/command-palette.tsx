@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from '@/lib/navigation';
 import { Kbd } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { useTheme } from '@/lib/theme';

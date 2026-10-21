@@ -17,7 +17,8 @@ import {
   Video,
 } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Navigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, withViewTransition } from '@/lib/navigation';
 import { Lobby } from '@/call/lobby';
 import { useLocalMedia } from '@/call/local-media';
 import { BrandMark, brandStyle } from '@/components/brand';
@@ -98,7 +99,7 @@ function EnterRoom({ slug, membership }: { slug: string; membership: JoinRoomRes
           role={participant.role}
           media={media}
           lowBandwidth={lowBandwidth}
-          onJoin={(withCall) => setEntered({ withCall })}
+          onJoin={(withCall) => withViewTransition(() => setEntered({ withCall }))}
         />
       </div>
     );
@@ -136,7 +137,7 @@ function EndedNotice({ room }: { room: PublicRoom }) {
 function RoomAside({ room, children }: { room: PublicRoom; children?: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-md">
-      <div className="rounded-2xl border bg-card p-6 shadow-raised">
+      <div className="liquid-glass rounded-2xl p-6">
         <div className="flex items-center gap-3">
           <Avatar name={room.ownerName} size={40} />
           <div className="min-w-0">
@@ -155,7 +156,7 @@ function RoomAside({ room, children }: { room: PublicRoom; children?: ReactNode 
         <h2 className="mt-5 text-xl font-semibold tracking-tight">{room.title}</h2>
         {children}
       </div>
-      <ul className="mt-6 space-y-4 rounded-2xl border bg-card p-5 text-sm shadow-card">
+      <ul className="liquid-glass mt-6 space-y-4 rounded-2xl p-5 text-sm">
         {[
           { icon: Video, text: 'A video call — you can check your camera and microphone first.' },
           { icon: Code2, text: 'Shared notes, a code editor that runs code, and a whiteboard.' },

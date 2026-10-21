@@ -29,7 +29,8 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 - Dashboard with a candidates table (score, duration, status), live and upcoming rooms, stats
   and search; a command palette (Ctrl+K); settings with company branding (name, logo and colour
   shown to candidates on join pages and in rooms), a low-bandwidth mode, data export and account
-  deletion. Light theme by default, dark as an option.
+  deletion. Light theme by default, dark as an option. The landing page opens with a cinematic
+  video hero, and every page change cross-fades (view transitions).
 
 ## Stack
 
@@ -42,7 +43,7 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 | Auth           | Better Auth (Google + GitHub), room-scoped JWTs for guests                  |
 | API            | Hono + zod                                                                  |
 | Web            | React 19, Vite, React Router, TanStack Query, Tailwind CSS 4, Radix UI      |
-| UI             | Geist fonts, cmdk command palette, sonner toasts                            |
+| UI             | Geist + Instrument Serif (self-hosted), cmdk palette, sonner toasts         |
 | Video call     | WebRTC mesh between browsers, signalled through the room's Durable Object   |
 | Editors        | Monaco + `y-monaco` (code), TipTap + Yjs (notes)                            |
 | Whiteboard     | Excalidraw, synced through the room's Yjs document                          |

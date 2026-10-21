@@ -1,7 +1,8 @@
 import { CheckCircle2 } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link } from '@/lib/navigation';
 import { Logo, ThemeToggle } from '@/components/layout';
+import { BackgroundVideo } from './cinematic-hero';
 import { RoomPreview } from './previews';
 
 const POINTS = [
@@ -48,21 +49,25 @@ export function AuthLayout({
           .
         </p>
       </div>
-      <div className="relative isolate hidden overflow-hidden border-l bg-muted/50 lg:flex lg:flex-col lg:justify-center lg:px-14">
-        <div className="bg-dots mask-radial absolute inset-0 -z-10 opacity-70" />
-        {aside ?? (
-          <div className="mx-auto w-full max-w-lg">
-            <RoomPreview />
-            <ul className="mt-8 space-y-3">
-              {POINTS.map((p) => (
-                <li key={p} className="flex items-start gap-3 text-sm text-foreground/85">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
-                  {p}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+      {/* The landing hero's video, so moving between the two feels like one place. */}
+      <div className="cinematic relative isolate hidden overflow-hidden lg:flex lg:flex-col lg:justify-center lg:px-14">
+        <BackgroundVideo />
+        <div aria-hidden className="absolute inset-0 z-0 bg-[hsl(201_100%_13%/0.35)]" />
+        <div className="relative z-10">
+          {aside ?? (
+            <div className="mx-auto w-full max-w-lg">
+              <RoomPreview className="border-white/15 bg-black/35 backdrop-blur-md" />
+              <ul className="liquid-glass mt-8 space-y-3 rounded-2xl p-5">
+                {POINTS.map((p) => (
+                  <li key={p} className="flex items-start gap-3 text-sm text-foreground/90">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
