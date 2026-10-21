@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { claimRoutes } from './api/claim';
 import { meRoutes } from './api/me';
 import { practiceRoutes } from './api/practice';
 import { questionRoutes } from './api/questions';
@@ -64,6 +65,7 @@ export function createApp(deps: AppDeps) {
   app.route('/', sessionRoutes(deps));
   app.route('/', questionRoutes());
   app.route('/', practiceRoutes(deps));
+  app.route('/', claimRoutes());
 
   return app;
 }

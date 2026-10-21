@@ -1,7 +1,14 @@
-import { isInterviewerRole, type JoinRoomResponse, type PresenceState } from '@sidebyside/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  isInterviewerRole,
+  type ClaimTokenResponse,
+  type JoinRoomResponse,
+  type PresenceState,
+} from '@sidebyside/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
+  ArrowRight,
+  BookmarkCheck,
   Check,
   Code2,
   Flag,
@@ -30,6 +37,7 @@ import {
 } from '@/components/ui/overlay';
 import { toast } from '@/components/ui/toaster';
 import { api } from '@/lib/api';
+import { getGuestToken, setClaimToken } from '@/lib/guest-tokens';
 import { cn, colorFor } from '@/lib/utils';
 import { NotesEditor } from '@/notes/notes-editor';
 import { ActivityStrip, describeSignals, useSignals } from './activity-feed';
@@ -406,10 +414,55 @@ function SessionEnded({
           </Button>
         </div>
       ) : (
-        <p className="mt-4 max-w-sm text-sm text-muted-foreground">
-          Thanks for joining — you can close this tab now.
-        </p>
+        <>
+          <p className="mt-4 max-w-sm text-sm text-muted-foreground">
+            Thanks for joining — you can close this tab now.
+          </p>
+          {getGuestToken(slug) && <ClaimPrompt roomId={roomId} slug={slug} />}
+        </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Guest candidates can save the session to an account when the interviewer shared its replay
+ * or feedback with them. The server decides; when there is nothing to claim this shows nothing.
+ */
+function ClaimPrompt({ roomId, slug }: { roomId: string; slug: string }) {
+  const claim = useQuery({
+    queryKey: ['claim-token', roomId],
+    queryFn: async () => {
+      const { claimToken } = await api.json<ClaimTokenResponse>(`/rooms/${roomId}/claim-token`, {
+        method: 'POST',
+        roomKey: slug,
+      });
+      setClaimToken(roomId, claimToken);
+      return claimToken;
+    },
+    retry: false,
+    staleTime: Infinity,
+  });
+  if (!claim.isSuccess) return null;
+  return (
+    <div className="mt-8 w-full max-w-md animate-fade-up rounded-2xl border bg-card p-5 text-left shadow-lg">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <BookmarkCheck className="size-4" />
+        </span>
+        <div>
+          <p className="font-medium">Keep your feedback</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The interviewer shared this session’s replay or feedback with you. Save it to a free
+            account to come back to it later.
+          </p>
+        </div>
+      </div>
+      <Button className="mt-4 w-full" asChild>
+        <Link to={`/claim/${roomId}`}>
+          Save to an account <ArrowRight />
+        </Link>
+      </Button>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseDocumentName } from '../collab/connect';
 import { signGuestToken, verifyGuestToken } from './guest-token';
 import {
+  canClaimSession,
   canConnectToDocument,
   canEndSession,
   canJoinLive,
@@ -33,6 +34,29 @@ describe('permissions', () => {
     expect(canViewReplay('candidate', ended)).toBe(false);
     expect(canViewReplay('candidate', { ...ended, shareReplayWithCandidate: true })).toBe(true);
     expect(canViewReplay('owner', { ...ended, status: 'live' })).toBe(false);
+  });
+
+  it('lets guest candidates claim an ended interview only when something is shared', () => {
+    const guest = { role: 'candidate' as const, userId: null };
+    const room = {
+      status: 'ended' as const,
+      mode: 'interview',
+      shareReplayWithCandidate: true,
+      shareReportWithCandidate: false,
+    };
+    expect(canClaimSession(guest, room)).toBe(true);
+    expect(
+      canClaimSession(guest, {
+        ...room,
+        shareReplayWithCandidate: false,
+        shareReportWithCandidate: true,
+      }),
+    ).toBe(true);
+    expect(canClaimSession(guest, { ...room, shareReplayWithCandidate: false })).toBe(false);
+    expect(canClaimSession(guest, { ...room, status: 'live' })).toBe(false);
+    expect(canClaimSession(guest, { ...room, mode: 'practice' })).toBe(false);
+    expect(canClaimSession({ ...guest, userId: 'u1' }, room)).toBe(false);
+    expect(canClaimSession({ role: 'interviewer', userId: null }, room)).toBe(false);
   });
 
   it('filters interviewer-only events', () => {

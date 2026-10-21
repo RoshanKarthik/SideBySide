@@ -127,7 +127,8 @@ export function CinematicHero({ id }: { id?: string }) {
         </div>
       </nav>
 
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-[90px] text-center">
+      {/* Bottom padding keeps the buttons above the fade into the page below. */}
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pt-4 pb-48 text-center">
         <h1 className="animate-fade-rise font-display max-w-7xl text-5xl leading-[0.95] font-normal tracking-[-2.46px] sm:text-7xl md:text-8xl">
           Where <em className="text-muted-foreground not-italic">talent</em> shows up{' '}
           <em className="text-muted-foreground not-italic">side by side.</em>

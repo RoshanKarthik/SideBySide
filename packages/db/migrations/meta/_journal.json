@@ -29,6 +29,13 @@
       "when": 1792581963351,
       "tag": "0003_branding_scores_html",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792599449769,
+      "tag": "0004_claim_token_index",
+      "breakpoints": true
     }
   ]
 }

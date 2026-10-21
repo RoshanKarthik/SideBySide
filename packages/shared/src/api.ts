@@ -132,6 +132,16 @@ export const joinRoomResponseSchema = z.object({
 });
 export type JoinRoomResponse = z.infer<typeof joinRoomResponseSchema>;
 
+/** A guest candidate's secret for attaching their seat in an ended session to an account. */
+export const claimTokenResponseSchema = z.object({ claimToken: z.string() });
+export type ClaimTokenResponse = z.infer<typeof claimTokenResponseSchema>;
+
+export const claimSessionSchema = z.object({ claimToken: z.string().min(1).max(200) });
+export type ClaimSessionInput = z.infer<typeof claimSessionSchema>;
+
+export const claimSessionResponseSchema = z.object({ room: roomSchema });
+export type ClaimSessionResponse = z.infer<typeof claimSessionResponseSchema>;
+
 export const REPLAY_MARKER_KINDS = [
   'code_run',
   'tests_run',

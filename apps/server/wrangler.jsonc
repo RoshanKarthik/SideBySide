@@ -36,6 +36,8 @@
     "TRUSTED_ORIGINS": "",
     "ALLOW_DEV_LOGIN": "false",
   },
+  // Daily retention cleanup: deletes rooms past their `delete_after` date (src/jobs/retention.ts).
+  "triggers": { "crons": ["30 3 * * *"] },
   "observability": { "enabled": true },
   "send_metrics": false,
 }

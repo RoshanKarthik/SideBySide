@@ -93,7 +93,8 @@ export function DashboardPage() {
   });
 
   const stats = useMemo(() => {
-    const list = rooms.data ?? [];
+    // Sessions someone saved to their account as the candidate aren't interviews they ran.
+    const list = (rooms.data ?? []).filter((r) => r.myRole !== 'candidate');
     const monthAgo = now - 30 * 24 * 3600 * 1000;
     const ended = list.filter((r) => r.status === 'ended');
     const scored = list.filter((r) => r.score !== null && r.mode === 'interview');
@@ -381,7 +382,16 @@ function RoomRow({ room }: { room: RoomListItem }) {
   const link = `${window.location.origin}/r/${room.slug}`;
   const ended = room.status === 'ended';
   const duration = durationOf(room);
-  const open = ended ? `/sessions/${room.id}` : `/r/${room.slug}`;
+  // A candidate who saved a session can open its replay when it was shared, never the summary.
+  const candidate = room.myRole === 'candidate';
+  const replay = !candidate || room.shareReplayWithCandidate;
+  const open = !ended
+    ? `/r/${room.slug}`
+    : candidate
+      ? replay
+        ? `/rooms/${room.id}/replay`
+        : null
+      : `/sessions/${room.id}`;
 
   return (
     <tr className="transition-colors hover:bg-muted/40 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-3 max-md:gap-y-1 max-md:px-4 max-md:py-3">
@@ -407,9 +417,13 @@ function RoomRow({ room }: { room: RoomListItem }) {
         </div>
       </td>
       <td className="max-w-[16rem] px-4 py-3 max-md:max-w-none max-md:p-0">
-        <Link to={open} className="block truncate hover:underline">
-          {room.title}
-        </Link>
+        {open ? (
+          <Link to={open} className="block truncate hover:underline">
+            {room.title}
+          </Link>
+        ) : (
+          <span className="block truncate">{room.title}</span>
+        )}
         <span className="text-xs text-muted-foreground">
           {LANGUAGE_INFO[room.defaultLanguage].label}
           {room.myRole !== 'owner' && room.mode !== 'practice' && ` · ${room.myRole}`}
@@ -449,55 +463,63 @@ function RoomRow({ room }: { room: RoomListItem }) {
       <td className="px-4 py-3 text-right max-md:ml-auto max-md:p-0">
         <div className="flex items-center justify-end gap-1.5">
           {ended ? (
-            <Button size="sm" variant="outline" asChild>
-              <Link to={`/sessions/${room.id}`}>Summary</Link>
-            </Button>
+            open && (
+              <Button size="sm" variant="outline" asChild>
+                <Link to={open}>{candidate ? 'Replay' : 'Summary'}</Link>
+              </Button>
+            )
           ) : (
             <Button size="sm" variant="outline" asChild>
               <Link to={`/r/${room.slug}`}>{room.status === 'live' ? 'Rejoin' : 'Open'}</Link>
             </Button>
           )}
-          <Menu>
-            <MenuTrigger asChild>
-              <Button size="icon-sm" variant="ghost" aria-label={`More for ${room.title}`}>
-                <MoreHorizontal />
-              </Button>
-            </MenuTrigger>
-            <MenuContent align="end">
-              {ended && (
-                <>
-                  <MenuItem onSelect={() => navigate(`/sessions/${room.id}`)}>
-                    <FileText /> Session summary
-                  </MenuItem>
-                  <MenuItem onSelect={() => navigate(`/rooms/${room.id}/replay`)}>
-                    <History /> Watch replay
-                  </MenuItem>
-                </>
-              )}
-              {!ended && room.mode !== 'practice' && (
-                <MenuItem
-                  onSelect={async () => {
-                    await navigator.clipboard.writeText(link);
-                    toast.success('Room link copied');
-                  }}
-                >
-                  <Copy /> Copy candidate link
-                </MenuItem>
-              )}
-              {room.myRole === 'owner' && (
-                <>
-                  <MenuSeparator />
+          {(!candidate || open) && (
+            <Menu>
+              <MenuTrigger asChild>
+                <Button size="icon-sm" variant="ghost" aria-label={`More for ${room.title}`}>
+                  <MoreHorizontal />
+                </Button>
+              </MenuTrigger>
+              <MenuContent align="end">
+                {ended && (
+                  <>
+                    {!candidate && (
+                      <MenuItem onSelect={() => navigate(`/sessions/${room.id}`)}>
+                        <FileText /> Session summary
+                      </MenuItem>
+                    )}
+                    {replay && (
+                      <MenuItem onSelect={() => navigate(`/rooms/${room.id}/replay`)}>
+                        <History /> Watch replay
+                      </MenuItem>
+                    )}
+                  </>
+                )}
+                {!ended && room.mode !== 'practice' && (
                   <MenuItem
-                    destructive
-                    disabled={room.status === 'live'}
-                    onSelect={() => setConfirm(true)}
+                    onSelect={async () => {
+                      await navigator.clipboard.writeText(link);
+                      toast.success('Room link copied');
+                    }}
                   >
-                    <Trash2 /> Delete session
+                    <Copy /> Copy candidate link
                   </MenuItem>
-                </>
-              )}
-            </MenuContent>
-          </Menu>
+                )}
+                {room.myRole === 'owner' && (
+                  <>
+                    <MenuSeparator />
+                    <MenuItem
+                      destructive
+                      disabled={room.status === 'live'}
+                      onSelect={() => setConfirm(true)}
+                    >
+                      <Trash2 /> Delete session
+                    </MenuItem>
+                  </>
+                )}
+              </MenuContent>
+            </Menu>
+          )}
         </div>
         <Dialog open={confirm} onOpenChange={setConfirm}>
           <DialogContent

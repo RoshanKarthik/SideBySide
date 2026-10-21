@@ -57,6 +57,7 @@ const pages = {
   session: () => import('@/routes/session'),
   practice: () => import('@/routes/practice'),
   settings: () => import('@/routes/settings'),
+  claim: () => import('@/routes/claim'),
 };
 
 /**
@@ -83,6 +84,7 @@ const router = createBrowserRouter([
   { path: '/sessions/:id', element: lazyPage(pages.session) },
   { path: '/practice', element: lazyPage(pages.practice) },
   { path: '/settings', element: lazyPage(pages.settings) },
+  { path: '/claim/:roomId', element: lazyPage(pages.claim) },
   { path: '/privacy', element: <PrivacyPage /> },
   { path: '/terms', element: <TermsPage /> },
   { path: '*', element: <NotFoundPage /> },
