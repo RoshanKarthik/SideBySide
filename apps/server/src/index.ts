@@ -5,6 +5,7 @@ import { createApp } from './app';
 import { authorizeConnection } from './collab/connect';
 import type { Room } from './collab/room';
 import type { AppDeps } from './context';
+import { deleteExpiredRooms } from './jobs/retention';
 
 export { Room } from './collab/room';
 export { Matchmaker } from './practice/matchmaker';
@@ -56,5 +57,16 @@ export default {
     }
     if (pathname.startsWith('/assets/runner.worker-')) return serveRunnerWorker(request, env);
     return env.ASSETS.fetch(request);
+  },
+
+  /** Daily cron (see wrangler.jsonc): deletes rooms whose retention period is over. */
+  async scheduled(_controller, env, ctx): Promise<void> {
+    const handle = await deps.openDb(env);
+    try {
+      const result = await deleteExpiredRooms(deps, env, handle.db);
+      console.log('Retention cleanup', result);
+    } finally {
+      ctx.waitUntil(handle.close().catch((e) => console.error('Failed to close db', e)));
+    }
   },
 } satisfies ExportedHandler<Env>;
