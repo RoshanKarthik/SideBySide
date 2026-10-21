@@ -49,6 +49,7 @@ Durable Objects and Hyperdrive) and Neon Free.
 apps/
   web/        React app (routes, room, editors, replay, code runner worker)
   server/     Cloudflare Worker: Hono API, Better Auth, room Durable Object
+  e2e/        Playwright end-to-end tests for the acceptance flows
 packages/
   shared/     zod schemas, event types, languages, Yjs document layout, replay format
   db/         Drizzle schema, migrations, database client, PGlite test helper
@@ -119,11 +120,36 @@ docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=
 | ------------------ | -------------------------------------------------- |
 | `pnpm dev`         | Worker + web app with hot reload                   |
 | `pnpm test`        | All unit and API tests (Postgres runs in PGlite)   |
+| `pnpm e2e`         | Playwright end-to-end tests (see below)            |
 | `pnpm typecheck`   | TypeScript across the workspace                    |
 | `pnpm lint`        | ESLint                                             |
 | `pnpm db:generate` | New SQL migration from `packages/db/src/schema.ts` |
 | `pnpm db:migrate`  | Apply migrations to `DATABASE_URL`                 |
 | `pnpm db:seed`     | Load (or refresh) the public question bank         |
+
+### End-to-end tests
+
+`apps/e2e` drives the three acceptance flows in Chromium with Playwright: an interview with a
+guest candidate (consent, Show to candidate, Run, Run tests with hidden tests, private notes and
+rubric, End session, replay), practice matchmaking with a role swap and ratings, and a candidate
+who keeps typing for 40 seconds offline and merges on reconnect. Each person has their own
+browser context, and signed-in users are fresh accounts made through the development sign-in,
+so runs don't depend on earlier data.
+
+They run against `pnpm dev` and your development database, so set up `.env` and `.dev.vars`
+(with `ALLOW_DEV_LOGIN=true`) as above, then:
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+pnpm --filter @sidebyside/e2e exec playwright install chromium
+pnpm e2e
+```
+
+`pnpm e2e` starts `pnpm dev` itself, or reuses it if it is already running. Pass Playwright
+options after it, for example `pnpm e2e offline` or `pnpm e2e --headed`. After a failure,
+`pnpm --filter @sidebyside/e2e exec playwright show-report` opens the report with a trace of
+each step. The tests are not part of `pnpm test`.
 
 ## Deploying
 
