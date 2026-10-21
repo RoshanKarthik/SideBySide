@@ -14,8 +14,14 @@ edit is recorded with a server timestamp, so the whole session can be **replayed
   **Run tests** reports pass/fail, and candidates never see the contents of hidden tests.
 - A private interviewer panel: private notes with one-click timestamps, a rubric, a timer, an
   editor lock and a co-interviewer invite link.
-- When the interviewer ends the session, the replay (notes, code and whiteboard) is available
-  with a marker for every code run.
+- Transparent activity signals (pastes, tab switches, leaving the window) that everyone in the
+  room sees — signals, never verdicts.
+- When the interviewer ends the session, a session summary (rubric, timeline, test results,
+  signals) and a replay of notes, code and whiteboard with markers for every key moment.
+- **Practice with a peer:** matchmaking by topic, difficulty and language, two rounds with a
+  role swap, and ratings afterwards.
+- Dashboard with stats and search, a command palette (Ctrl+K), settings with a low-bandwidth
+  mode, data export and account deletion. Dark and light themes.
 
 ## Stack
 
@@ -23,10 +29,12 @@ edit is recorded with a server timestamp, so the whole session can be **replayed
 | -------------- | --------------------------------------------------------------------------- |
 | Hosting        | One Cloudflare Worker serves the web app, the REST API and the WebSockets   |
 | Realtime       | Yjs, one Durable Object per room (`y-partyserver`), SQLite storage per room |
+| Matchmaking    | One `Matchmaker` Durable Object holding the practice queue                  |
 | Database       | Neon Postgres via Cloudflare Hyperdrive, Drizzle ORM                        |
 | Auth           | Better Auth (Google + GitHub), room-scoped JWTs for guests                  |
 | API            | Hono + zod                                                                  |
 | Web            | React 19, Vite, React Router, TanStack Query, Tailwind CSS 4, Radix UI      |
+| UI             | Geist fonts, cmdk command palette, sonner toasts, Motion (marketing pages)  |
 | Editors        | Monaco + `y-monaco` (code), TipTap + Yjs (notes)                            |
 | Whiteboard     | Excalidraw, synced through the room's Yjs document                          |
 | Code execution | Pyodide (Python) and a JS/TS runner in a locked-down Web Worker             |
@@ -49,11 +57,12 @@ packages/
 ### Where data lives
 
 - **Postgres (Neon):** users and sessions, rooms, participants, rounds, events, code runs,
-  questions and test cases, rubric scores.
+  questions and test cases, rubric scores, practice ratings.
 - **Each room's Durable Objects (SQLite):** the live shared Yjs document (notes, code,
   whiteboard), every update with its server timestamp, and a snapshot every minute. Replay reads
   from here. Interviewer-only data (private notes, rubric, timer) lives in a second document
-  that candidates can't connect to.
+  that candidates can't connect to. Each practice round has its own pair of documents.
+- **The Matchmaker Durable Object:** the practice queue (people waiting and recent matches).
 
 ## Local development
 
