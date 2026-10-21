@@ -1,74 +1,68 @@
-import '@fontsource/instrument-serif/400.css';
-import './cinematic.css';
 import { CheckCircle2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router';
-import { BackgroundVideo } from './cinematic-hero';
-import { ProductPreview } from './product-preview';
+import { Logo, ThemeToggle } from '@/components/layout';
+import { RoomPreview } from './previews';
 
 const POINTS = [
+  'Video call, code editor, tests and whiteboard in one room',
   'Candidates join from a link — no account, no install',
-  'Code runs in the browser, hidden tests stay on the server',
   'Replay every session with your private notes and rubric',
 ];
 
 /**
- * Split screen used by sign-in and join, in the landing page's cinematic theme so moving from
- * one to the other feels like one place: the form on the left, the video and product on the
- * right.
+ * Split screen used by sign-in and join: the form on the left, the product (or details about
+ * the room being joined) on the right.
  */
-export function AuthLayout({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
+export function AuthLayout({
+  children,
+  aside,
+  header,
+  style,
+}: {
+  children: ReactNode;
+  aside?: ReactNode;
+  /** Replaces the SideBySide logo, e.g. with the company's brand on a join page. */
+  header?: ReactNode;
+  style?: CSSProperties;
+}) {
   return (
-    <div className="cinematic grid min-h-full lg:grid-cols-2">
-      <div className="relative flex flex-col px-6 py-6 sm:px-10">
-        <Link
-          to="/"
-          viewTransition
-          className="font-display w-fit text-3xl tracking-tight text-foreground"
-          aria-label="SideBySide home"
-        >
-          SideBySide
-        </Link>
+    <div className="grid min-h-full bg-background lg:grid-cols-2" style={style}>
+      <div className="relative flex flex-col px-6 py-5 sm:px-10">
+        <div className="flex items-center justify-between">
+          {header ?? <Logo />}
+          <ThemeToggle />
+        </div>
         <div className="flex flex-1 items-center justify-center py-12">
-          <div className="animate-fade-rise w-full max-w-sm">{children}</div>
+          <div className="w-full max-w-sm animate-fade-up">{children}</div>
         </div>
         <p className="text-center text-xs text-muted-foreground">
           By continuing you agree to the{' '}
-          <Link
-            to="/terms"
-            viewTransition
-            className="underline underline-offset-2 hover:text-foreground"
-          >
+          <Link to="/terms" className="underline underline-offset-2 hover:text-foreground">
             Terms
           </Link>{' '}
           and{' '}
-          <Link
-            to="/privacy"
-            viewTransition
-            className="underline underline-offset-2 hover:text-foreground"
-          >
+          <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
             Privacy notice
           </Link>
           .
         </p>
       </div>
-      <div className="relative isolate hidden overflow-hidden lg:flex lg:flex-col lg:justify-center lg:px-14">
-        <BackgroundVideo />
-        <div className="relative z-10">
-          {aside ?? (
-            <>
-              <ProductPreview className="liquid-glass mx-auto w-full max-w-lg border-0 bg-black/30 shadow-2xl shadow-black/40 backdrop-blur-md" />
-              <ul className="liquid-glass mx-auto mt-8 w-full max-w-lg space-y-3 rounded-2xl bg-black/30 p-5 backdrop-blur-md">
-                {POINTS.map((p) => (
-                  <li key={p} className="flex items-start gap-3 text-sm text-foreground/85">
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
+      <div className="relative isolate hidden overflow-hidden border-l bg-muted/50 lg:flex lg:flex-col lg:justify-center lg:px-14">
+        <div className="bg-dots mask-radial absolute inset-0 -z-10 opacity-70" />
+        {aside ?? (
+          <div className="mx-auto w-full max-w-lg">
+            <RoomPreview />
+            <ul className="mt-8 space-y-3">
+              {POINTS.map((p) => (
+                <li key={p} className="flex items-start gap-3 text-sm text-foreground/85">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

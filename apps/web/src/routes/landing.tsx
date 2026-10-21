@@ -1,117 +1,183 @@
 import {
+  AppWindow,
+  ArrowRight,
+  Building2,
+  CalendarCheck,
+  CheckCircle2,
+  ClipboardCheck,
   Code2,
   EyeOff,
   History,
-  Link2,
   Lock,
-  NotebookPen,
   PenTool,
   ShieldCheck,
-  Signal,
-  Sparkles,
+  Timer,
+  Trash2,
   Users,
+  Video,
+  type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { LogoMark } from '@/components/layout';
-import { CinematicHero } from '@/components/marketing/cinematic-hero';
-import { ProductPreview } from '@/components/marketing/product-preview';
-import { Reveal } from '@/components/marketing/reveal';
+import { MarketingShell } from '@/components/layout';
+import {
+  BoardMini,
+  BrandMini,
+  CallMini,
+  EditorMini,
+  PanelMini,
+  PreviewMini,
+  ReplayMini,
+  RoomPreview,
+  SignalsMini,
+  TestsMini,
+} from '@/components/marketing/previews';
+import { Button } from '@/components/ui/button';
 import { useSession } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
 
-const FEATURES = [
+/** Everything a structured technical interview needs, each shown with a small product picture. */
+const PARTS: {
+  icon: LucideIcon;
+  title: string;
+  body: string;
+  preview: ReactNode;
+}[] = [
   {
-    icon: Code2,
-    title: 'A real editor that runs code',
-    body: 'Monaco with live cursors for both of you. Python, JavaScript and TypeScript run in a sandbox right in the browser.',
-    span: 'md:col-span-2',
+    icon: Video,
+    title: 'Face-to-face video call',
+    body: 'Camera and microphone right inside the room, with a device check before you join. No separate meeting link.',
+    preview: <CallMini />,
   },
   {
-    icon: EyeOff,
-    title: 'Hidden test cases',
-    body: 'Run tests reports pass or fail. Hidden inputs never leave the server for the candidate.',
+    icon: Code2,
+    title: 'A shared editor that runs code',
+    body: 'Monaco with live cursors for everyone. Python, JavaScript and TypeScript run in a sandbox in the browser.',
+    preview: <EditorMini />,
+  },
+  {
+    icon: ClipboardCheck,
+    title: 'Hidden tests and a score',
+    body: 'Weighted test cases give one clear score. Hidden inputs never reach the candidate.',
+    preview: <TestsMini />,
   },
   {
     icon: PenTool,
-    title: 'Shared whiteboard',
-    body: 'Sketch the system design with live pointers and ready-made templates.',
+    title: 'System design whiteboard',
+    body: 'Sketch architectures together with live pointers and ready-made templates.',
+    preview: <BoardMini />,
   },
   {
     icon: Lock,
     title: 'Private interviewer panel',
-    body: 'Question bank, hints, timestamped notes, a rubric and a timer only interviewers can see.',
+    body: 'Question bank, hints, timestamped notes and a rubric only interviewers can see.',
+    preview: <PanelMini />,
+  },
+  {
+    icon: EyeOff,
+    title: 'Transparent activity signals',
+    body: 'Pastes and tab switches are shown to everyone in the room. Signals, never verdicts.',
+    preview: <SignalsMini />,
   },
   {
     icon: History,
-    title: 'Replay every session',
-    body: 'Scrub back through notes, code and whiteboard with markers for runs and tests.',
+    title: 'Full session replay',
+    body: 'Replay notes, code and whiteboard with markers for questions, hints and test runs.',
+    preview: <ReplayMini />,
+  },
+  {
+    icon: AppWindow,
+    title: 'Live front-end preview',
+    body: 'HTML, CSS and JavaScript render in a sandboxed preview as the candidate types.',
+    preview: <PreviewMini />,
+  },
+  {
+    icon: Building2,
+    title: 'Your company on the room',
+    body: 'Your name, logo and colour on the join page and in the room candidates see.',
+    preview: <BrandMini />,
+  },
+];
+
+const FLOW: { icon: LucideIcon; label: string; title: string; items: string[] }[] = [
+  {
+    icon: CalendarCheck,
+    label: 'Before',
+    title: 'Prepare in two minutes',
+    items: [
+      'Create a room and pick the language',
+      'Choose questions from your bank or the public one',
+      'Send the candidate one link — no account needed',
+    ],
+  },
+  {
+    icon: Timer,
+    label: 'During',
+    title: 'Run a structured interview',
+    items: [
+      'The candidate checks camera and microphone in the lobby',
+      'Show the question, reveal hints, lock the editor when needed',
+      'Run hidden tests and take timestamped notes',
+    ],
+  },
+  {
+    icon: CheckCircle2,
+    label: 'After',
+    title: 'Decide with evidence',
+    items: [
+      'Score the rubric while it’s fresh',
+      'Review the replay and its key moments',
+      'Compare candidates by score on your dashboard',
+    ],
+  },
+];
+
+const TRUST: { icon: LucideIcon; title: string; body: string }[] = [
+  {
+    icon: EyeOff,
+    title: 'Hidden tests stay hidden',
+    body: 'Inputs and expected output are filtered on the server for candidates.',
+  },
+  {
+    icon: Video,
+    title: 'Calls are not recorded',
+    body: 'Audio and video go directly between participants and are never stored.',
   },
   {
     icon: ShieldCheck,
-    title: 'Transparent by design',
-    body: 'Everyone sees the same activity signals. Signals, never verdicts.',
-    span: 'md:col-span-3',
+    title: 'Clear consent',
+    body: 'Everyone is told what is recorded before they join a room.',
+  },
+  {
+    icon: Trash2,
+    title: 'Automatic deletion',
+    body: 'Sessions are deleted after 7, 30 or 90 days — or whenever you choose.',
   },
 ];
 
-const STEPS = [
-  {
-    icon: Link2,
-    title: 'Create a room, send the link',
-    body: 'Pick a language and questions. The candidate joins with just their name — no account, no install.',
-  },
-  {
-    icon: NotebookPen,
-    title: 'Discuss, code and sketch together',
-    body: 'Show the problem, reveal hints, run code and tests. Your notes and rubric stay private.',
-  },
-  {
-    icon: History,
-    title: 'Replay and decide',
-    body: 'End the session and review the full replay with your rubric before the debrief.',
-  },
-];
-
-const STATS = [
-  { icon: Signal, label: 'Built for slow connections' },
-  { icon: Code2, label: 'Runs code in the browser' },
-  { icon: Users, label: 'Peer practice mode' },
-  { icon: Sparkles, label: 'Free, no card needed' },
-];
-
-/** Section heading in the hero's voice: a small label, then a serif title. */
-function Heading({
+function SectionHeading({
   eyebrow,
+  title,
   children,
   center,
 }: {
   eyebrow: string;
-  children: ReactNode;
+  title: ReactNode;
+  children?: ReactNode;
   center?: boolean;
 }) {
   return (
     <div className={cn('max-w-2xl', center && 'mx-auto text-center')}>
-      <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">{eyebrow}</p>
-      <h2 className="font-display mt-4 text-4xl leading-[1.05] tracking-[-1px] sm:text-6xl">
-        {children}
+      <p className="text-xs font-semibold tracking-wider text-primary uppercase">{eyebrow}</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        {title}
       </h2>
-    </div>
-  );
-}
-
-function GlassLink({ to, children, large }: { to: string; children: ReactNode; large?: boolean }) {
-  return (
-    <Link
-      to={to}
-      viewTransition
-      className={cn(
-        'liquid-glass inline-flex rounded-full text-foreground transition-transform duration-300 hover:scale-[1.03]',
-        large ? 'px-12 py-4 text-base' : 'px-7 py-3 text-sm',
+      {children && (
+        <p className="mt-4 text-base leading-relaxed text-pretty text-muted-foreground">
+          {children}
+        </p>
       )}
-    >
-      {children}
-    </Link>
+    </div>
   );
 }
 
@@ -121,128 +187,169 @@ export default function LandingPage() {
   const practice = session ? '/practice' : '/login?next=/practice';
 
   return (
-    <div className="cinematic cinematic-page flex min-h-full flex-col">
-      <CinematicHero />
-
-      {/* The product, up close */}
-      <section className="relative">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 px-6 pt-16 pb-24 lg:grid-cols-[1fr_1.15fr]">
-          <Reveal>
-            <Heading eyebrow="See it in action">
-              Interviews, <em className="text-muted-foreground not-italic">side by side.</em>
-            </Heading>
-            <p className="mt-6 max-w-lg leading-relaxed text-muted-foreground">
-              Both of you type in the same editor with live cursors. Run the code, run the hidden
-              tests, sketch the design, and replay all of it afterwards.
+    <MarketingShell>
+      {/* Hero */}
+      <section className="relative isolate overflow-hidden border-b">
+        <div className="bg-dots mask-fade-b absolute inset-0 -z-10 opacity-50" />
+        <div className="absolute -top-40 left-1/2 -z-10 h-[28rem] w-[64rem] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,var(--glow),transparent)]" />
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:py-24">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-card">
+              <span className="size-1.5 rounded-full bg-success" /> Technical interview platform
             </p>
-            <div className="mt-10 flex flex-wrap items-center gap-6">
-              <GlassLink to={start}>Start an interview</GlassLink>
-              <Link
-                to={practice}
-                viewTransition
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Practise with a peer →
-              </Link>
+            <h1 className="mt-6 text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-[3.4rem] lg:leading-[1.05]">
+              The whole technical interview, in one link.
+            </h1>
+            <p className="mt-5 max-w-xl text-lg leading-relaxed text-pretty text-muted-foreground">
+              Video call, a shared editor that runs code, hidden tests with a score, a whiteboard
+              and a private scorecard — with a full replay when you’re done.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button size="lg" variant="glow" asChild>
+                <Link to={start}>
+                  Start an interview <ArrowRight />
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link to={practice}>
+                  <Users /> Practise with a peer
+                </Link>
+              </Button>
             </div>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <ProductPreview className="liquid-glass border-0 bg-white/[0.03] shadow-2xl shadow-black/40" />
-          </Reveal>
+            <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+              {['No install for candidates', 'Runs in the browser', 'Free to use'].map((t) => (
+                <li key={t} className="flex items-center gap-1.5">
+                  <CheckCircle2 className="size-4 text-success" /> {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <RoomPreview className="w-full" />
         </div>
-        <Reveal className="mx-auto max-w-6xl px-6">
-          <ul className="liquid-glass grid grid-cols-2 rounded-2xl sm:grid-cols-4">
-            {STATS.map(({ icon: Icon, label }) => (
-              <li
-                key={label}
-                className="flex items-center justify-center gap-2 px-4 py-5 text-sm text-muted-foreground"
+      </section>
+
+      {/* What a good interview needs */}
+      <section id="features" className="scroll-mt-16 border-b bg-muted/30">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+          <SectionHeading eyebrow="Everything in one room" title="What a good interview needs">
+            Each part of a fair, structured interview is built in, so you never juggle a meeting
+            app, a code pad and a spreadsheet.
+          </SectionHeading>
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {PARTS.map(({ icon: Icon, title, body, preview }) => (
+              <article
+                key={title}
+                className="flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-card"
               >
-                <Icon className="size-4 text-foreground/80" /> {label}
+                <div className="border-b bg-muted/40 p-4">{preview}</div>
+                <div className="p-5">
+                  <h3 className="flex items-center gap-2 font-semibold">
+                    <Icon className="size-4 text-primary" /> {title}
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How an interview runs */}
+      <section id="how-it-works" className="scroll-mt-16 border-b">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+          <SectionHeading eyebrow="How it works" title="From invite to decision">
+            A clear routine for every interviewer on your team.
+          </SectionHeading>
+          <ol className="mt-12 grid gap-4 md:grid-cols-3">
+            {FLOW.map(({ icon: Icon, label, title, items }, i) => (
+              <li key={label} className="h-full rounded-xl border bg-card p-6 shadow-card">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                    {i + 1}. {label}
+                  </span>
+                </div>
+                <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {items.map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
-          </ul>
-        </Reveal>
+          </ol>
+        </div>
       </section>
 
-      {/* Features */}
-      <section id="features" className="mx-auto w-full max-w-6xl scroll-mt-8 px-6 py-28">
-        <Reveal>
-          <Heading eyebrow="Everything in one room" center>
-            What a good interview <em className="text-muted-foreground not-italic">needs.</em>
-          </Heading>
-        </Reveal>
-        <div className="mt-16 grid gap-4 md:grid-cols-3">
-          {FEATURES.map(({ icon: Icon, title, body, span }, i) => (
-            <Reveal key={title} delay={i * 0.06} className={cn(span)}>
-              <div className="liquid-glass glass-card h-full rounded-2xl p-7">
-                <Icon className="size-5 text-foreground/80" />
-                <h3 className="font-display mt-6 text-2xl tracking-[-0.3px]">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
+      {/* Practice */}
+      <section id="practice" className="scroll-mt-16 border-b bg-muted/30">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-20 sm:px-6 lg:grid-cols-2">
+          <SectionHeading eyebrow="Practice mode" title="Prepare with a peer, then swap roles">
+            Get matched with someone at your level. You interview them for one round, they interview
+            you for the next, and you rate each other at the end.
+          </SectionHeading>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { k: 'Matched', v: 'by topic and level' },
+              { k: '2 rounds', v: 'roles swap halfway' },
+              { k: 'Feedback', v: 'private ratings' },
+            ].map(({ k, v }) => (
+              <div key={k} className="rounded-xl border bg-card p-5 shadow-card">
+                <p className="text-lg font-semibold">{k}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{v}</p>
               </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how-it-works" className="mx-auto w-full max-w-6xl scroll-mt-8 px-6 py-24">
-        <Reveal>
-          <Heading eyebrow="How it works">
-            From link to decision,{' '}
-            <em className="text-muted-foreground not-italic">in three steps.</em>
-          </Heading>
-        </Reveal>
-        <ol className="mt-16 grid gap-10 md:grid-cols-3">
-          {STEPS.map(({ icon: Icon, title, body }, i) => (
-            <Reveal key={title} delay={i * 0.08}>
-              <li className="border-t border-white/15 pt-6">
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <span className="font-display text-3xl text-foreground">0{i + 1}</span>
-                  <Icon className="size-4" />
-                </div>
-                <h3 className="font-display mt-4 text-2xl tracking-[-0.3px]">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-              </li>
-            </Reveal>
-          ))}
-        </ol>
-      </section>
-
-      {/* Closing call to action */}
-      <section className="mx-auto w-full max-w-6xl px-6 pt-12 pb-32 text-center">
-        <Reveal>
-          <h2 className="font-display mx-auto max-w-4xl text-5xl leading-[0.95] tracking-[-2px] sm:text-7xl">
-            Run your next interview{' '}
-            <em className="text-muted-foreground not-italic">side by side.</em>
-          </h2>
-          <p className="mx-auto mt-6 max-w-xl text-muted-foreground">
-            Free to use. Candidates join without an account.
-          </p>
-          <div className="mt-12">
-            <GlassLink to={start} large>
-              Create your first room
-            </GlassLink>
+            ))}
+            <Button variant="outline" className="sm:col-span-3" asChild>
+              <Link to={practice}>
+                Find a practice partner <ArrowRight />
+              </Link>
+            </Button>
           </div>
-        </Reveal>
+        </div>
       </section>
 
-      <footer className="border-t border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-8 text-xs text-muted-foreground">
-          <span className="flex items-center gap-2">
-            <LogoMark className="size-5" />
-            <span className="font-display text-base text-foreground">SideBySide</span> — interviews
-            without screen sharing.
-          </span>
-          <span className="flex gap-6">
-            <Link to="/privacy" viewTransition className="hover:text-foreground">
-              Privacy
-            </Link>
-            <Link to="/terms" viewTransition className="hover:text-foreground">
-              Terms
-            </Link>
-          </span>
+      {/* Trust */}
+      <section id="trust" className="scroll-mt-16 border-b">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+          <SectionHeading
+            eyebrow="Privacy and fairness"
+            title="Built for candidates’ trust"
+            center
+          />
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {TRUST.map(({ icon: Icon, title, body }) => (
+              <div key={title} className="rounded-xl border bg-card p-5 shadow-card">
+                <Icon className="size-5 text-primary" />
+                <h3 className="mt-3 font-semibold">{title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{body}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </footer>
-    </div>
+      </section>
+
+      {/* Call to action */}
+      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+        <div className="relative isolate overflow-hidden rounded-2xl bg-primary px-6 py-14 text-center text-primary-foreground shadow-raised sm:px-12">
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_80%_at_50%_0%,rgb(255_255_255/0.18),transparent)]" />
+          <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+            Run your next technical interview here
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-primary-foreground/80">
+            Create a room in a minute. Candidates join from the link with a name.
+          </p>
+          <Button size="lg" variant="secondary" className="mt-8" asChild>
+            <Link to={start}>
+              Create a room <ArrowRight />
+            </Link>
+          </Button>
+        </div>
+      </section>
+    </MarketingShell>
   );
 }

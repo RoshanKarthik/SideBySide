@@ -25,4 +25,4 @@ export const SNAPSHOT_INTERVAL_MS = 60_000;
 
 export const CONSENT_NOTICE =
   'This room records edits, code runs, pastes and tab switches so the session can be replayed. ' +
-  'Everyone in the room can see these signals.';
+  'Everyone in the room can see these signals. The video call is not recorded.';

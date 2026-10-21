@@ -22,6 +22,13 @@
       "when": 1792520008112,
       "tag": "0002_practice_and_rounds",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792581963351,
+      "tag": "0003_branding_scores_html",
+      "breakpoints": true
     }
   ]
 }

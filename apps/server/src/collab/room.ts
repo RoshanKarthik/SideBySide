@@ -44,6 +44,8 @@ const FLUSH_INTERVAL_MS = 2_000;
 const FLUSH_MAX_UPDATES = 200;
 const CLIENT_EVENTS_PER_MINUTE = 60;
 const TEST_RUNS_PER_MINUTE = 5;
+/** Offers, answers and ICE candidates for up to a few call peers, with room for renegotiation. */
+const RTC_SIGNALS_PER_MINUTE = 1_200;
 /** Long enough for the interviewer's browser to load Python on a slow connection. */
 const TEST_REQUEST_TIMEOUT_MS = 120_000;
 
@@ -55,6 +57,8 @@ interface PendingUpdate {
 
 interface ConnectionState {
   sbs?: ConnectionInfo;
+  /** This tab's id in the video call, once it has joined. */
+  callId?: string;
 }
 
 interface PendingTestRequest {
@@ -79,6 +83,10 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 function infoOf(connection: unknown): ConnectionInfo | null {
   if (!connection || typeof connection !== 'object' || !('state' in connection)) return null;
   return (connection as Connection<ConnectionState>).state?.sbs ?? null;
+}
+
+function callIdOf(connection: Connection): string | undefined {
+  return (connection as Connection<ConnectionState>).state?.callId;
 }
 
 /** Sliding one-minute window rate limiter, per key. */
@@ -114,6 +122,7 @@ export class Room extends YServer {
   private runLimiter = new MinuteLimiter(LIMITS.runsPerMinute);
   private testLimiter = new MinuteLimiter(TEST_RUNS_PER_MINUTE);
   private eventLimiter = new MinuteLimiter(CLIENT_EVENTS_PER_MINUTE);
+  private rtcLimiter = new MinuteLimiter(RTC_SIGNALS_PER_MINUTE);
   private testRequests = new Map<string, PendingTestRequest>();
 
   private get store() {
@@ -295,7 +304,44 @@ export class Room extends YServer {
       case 'tests_result':
         if (this.part !== 'shared' || !interviewer) return;
         return this.completeTests(connection, msg.requestId, msg.source, msg.outcomes);
+      case 'rtc':
+        if (this.part !== 'shared') return;
+        return this.relaySignal(connection, info, msg);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Video call signalling
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Passes WebRTC offers, answers and ICE candidates from one call participant to another.
+   * Media itself goes directly between browsers and never reaches the server. A call id
+   * belongs to the first connection that uses it, so nobody can take over another tab's id.
+   */
+  private relaySignal(
+    connection: Connection,
+    info: ConnectionInfo,
+    msg: Extract<ClientMessage, { kind: 'rtc' }>,
+  ) {
+    if (!this.rtcLimiter.allow(info.participantId)) return;
+    const owner = this.callConnection(msg.from);
+    if (owner && owner.id !== connection.id) {
+      return this.sendError(connection, 'call_id_taken', 'Rejoin the call to continue.');
+    }
+    if (callIdOf(connection) !== msg.from) {
+      connection.setState((prev: ConnectionState | null) => ({ ...prev, callId: msg.from }));
+    }
+    if (!msg.to || !msg.signal) return;
+    const target = this.callConnection(msg.to);
+    if (target) this.send(target, { kind: 'rtc', from: msg.from, signal: msg.signal });
+  }
+
+  private callConnection(callId: string): Connection | undefined {
+    for (const c of this.getConnections()) {
+      if (callIdOf(c) === callId) return c;
+    }
+    return undefined;
   }
 
   // ---------------------------------------------------------------------------
@@ -489,6 +535,7 @@ export class Room extends YServer {
           stdin: testCases.stdin,
           expectedStdout: testCases.expectedStdout,
           isHidden: testCases.isHidden,
+          weight: testCases.weight,
         })
         .from(testCases)
         .where(eq(testCases.questionId, req.questionId))
@@ -527,6 +574,7 @@ export class Room extends YServer {
         status: full.passed === full.total ? 'ok' : 'error',
         testsPassed: full.passed,
         testsTotal: full.total,
+        score: full.score,
         details: full.results,
         serverTs: new Date(serverTs),
       }),
@@ -536,6 +584,7 @@ export class Room extends YServer {
       language: req.language,
       passed: full.passed,
       total: full.total,
+      score: full.score,
     });
   }
 

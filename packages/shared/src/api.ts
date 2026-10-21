@@ -10,6 +10,30 @@ export type ApiError = z.infer<typeof apiErrorSchema>;
 
 const displayName = z.string().trim().min(1).max(LIMITS.displayNameChars);
 
+/** Logos are stored inline: small PNG, JPEG or WebP images, resized in the browser. */
+export const BRAND_LOGO_MAX_CHARS = 120_000;
+export const brandLogoSchema = z
+  .string()
+  .max(BRAND_LOGO_MAX_CHARS)
+  .regex(
+    /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/,
+    'Must be a PNG, JPEG or WebP image',
+  );
+export const brandColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a hex colour');
+
+/** The company shown on an interviewer's join pages and rooms. */
+export const brandSchema = z.object({
+  companyName: z.string().trim().max(80).nullable(),
+  logo: brandLogoSchema.nullable(),
+  color: brandColorSchema.nullable(),
+});
+export type Brand = z.infer<typeof brandSchema>;
+
+/** A brand with nothing set is no brand at all. */
+export function brandOrNull(brand: Brand): Brand | null {
+  return brand.companyName || brand.logo || brand.color ? brand : null;
+}
+
 export const meSchema = z.object({
   id: z.string(),
   email: z.string(),
@@ -17,6 +41,7 @@ export const meSchema = z.object({
   avatarUrl: z.string().nullable(),
   defaultLanguage: langSchema,
   lowBandwidth: z.boolean(),
+  brand: brandSchema,
 });
 export type Me = z.infer<typeof meSchema>;
 
@@ -25,6 +50,7 @@ export const patchMeSchema = z
     displayName,
     defaultLanguage: langSchema,
     lowBandwidth: z.boolean(),
+    brand: brandSchema.partial(),
   })
   .partial();
 export type PatchMe = z.infer<typeof patchMeSchema>;
@@ -61,7 +87,15 @@ export const roomSchema = z.object({
 });
 export type Room = z.infer<typeof roomSchema>;
 
-export const roomListItemSchema = roomSchema.extend({ myRole: roomRoleSchema });
+export const roomListItemSchema = roomSchema.extend({
+  myRole: roomRoleSchema,
+  /** The first candidate who joined (interview rooms) or the practice partner. */
+  candidateName: z.string().nullable(),
+  /** Score of the latest test run in the room, 0–100. */
+  score: z.number().int().nullable(),
+  testsPassed: z.number().int().nullable(),
+  testsTotal: z.number().int().nullable(),
+});
 export type RoomListItem = z.infer<typeof roomListItemSchema>;
 
 export const createRoomResponseSchema = z.object({ room: roomSchema, link: z.string() });
@@ -71,6 +105,7 @@ export const publicRoomSchema = z.object({
   title: z.string(),
   ownerName: z.string(),
   status: roomStatusSchema,
+  brand: brandSchema.nullable(),
 });
 export type PublicRoom = z.infer<typeof publicRoomSchema>;
 
@@ -92,6 +127,8 @@ export const joinRoomResponseSchema = z.object({
   participant: participantSchema,
   /** Room-scoped token for guests; registered users authenticate with their session cookie. */
   collabToken: z.string().nullable(),
+  /** The room owner's company, shown in the room. */
+  brand: brandSchema.nullable(),
 });
 export type JoinRoomResponse = z.infer<typeof joinRoomResponseSchema>;
 
@@ -161,6 +198,7 @@ export const sessionSummarySchema = z.object({
           ts: z.number(),
           passed: z.number().int(),
           total: z.number().int(),
+          score: z.number().int().nullable(),
           language: langSchema,
         }),
       ),

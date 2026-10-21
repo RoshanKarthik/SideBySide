@@ -1,4 +1,5 @@
 import {
+  brandOrNull,
   createRoomSchema,
   eventVisibility,
   joinRoomSchema,
@@ -12,11 +13,16 @@ import {
 import {
   and,
   asc,
+  codeRuns,
   count,
   desc,
   eq,
   events,
   gte,
+  inArray,
+  isNull,
+  ne,
+  or,
   participants,
   rooms,
   sessionRounds,
@@ -32,7 +38,7 @@ import { parseBody } from '../lib/validate';
 import { randomSlug } from '../lib/slug';
 import { buildMarkers } from '../lib/markers';
 import { loadRounds, parseRound, seesPrivateDataOf } from '../lib/rounds';
-import { roomLink, toRoomDto } from '../lib/serialize';
+import { roomBrand, roomLink, toBrand, toRoomDto } from '../lib/serialize';
 
 const ROOMS_PER_DAY = 20;
 
@@ -105,14 +111,66 @@ export function roomRoutes(deps: AppDeps) {
 
   app.get('/rooms', async (c) => {
     const user = await requireUser(c);
-    const rows = await c.var.db
-      .select({ room: rooms, role: participants.role })
+    const db = c.var.db;
+    const rows = await db
+      .select({ room: rooms, role: participants.role, me: participants.id })
       .from(participants)
       .innerJoin(rooms, eq(rooms.id, participants.roomId))
       .where(eq(participants.userId, user.id))
       .orderBy(desc(rooms.createdAt))
       .limit(200);
-    const body: RoomListItem[] = rows.map((r) => ({ ...toRoomDto(r.room), myRole: r.role }));
+    const ids = rows.map((r) => r.room.id);
+
+    // Who was interviewed (the first candidate to join, or the practice partner) and the
+    // latest test score in each room, for the dashboard's candidates overview.
+    const [others, scores] = ids.length
+      ? await Promise.all([
+          db
+            .select({
+              roomId: participants.roomId,
+              id: participants.id,
+              name: participants.displayName,
+              role: participants.role,
+            })
+            .from(participants)
+            .where(
+              and(
+                inArray(participants.roomId, ids),
+                // Guests have no user id; `<>` alone would drop them.
+                or(isNull(participants.userId), ne(participants.userId, user.id)),
+              ),
+            )
+            .orderBy(asc(participants.joinedAt)),
+          db
+            .selectDistinctOn([codeRuns.roomId], {
+              roomId: codeRuns.roomId,
+              score: codeRuns.score,
+              passed: codeRuns.testsPassed,
+              total: codeRuns.testsTotal,
+            })
+            .from(codeRuns)
+            .where(and(inArray(codeRuns.roomId, ids), eq(codeRuns.kind, 'tests')))
+            .orderBy(codeRuns.roomId, desc(codeRuns.serverTs)),
+        ])
+      : [[], []];
+    const candidateOf = new Map<string, string>();
+    for (const p of others) {
+      if (candidateOf.has(p.roomId)) continue;
+      if (p.role === 'candidate' || p.role === 'peer') candidateOf.set(p.roomId, p.name);
+    }
+    const scoreOf = new Map(scores.map((s) => [s.roomId, s]));
+
+    const body: RoomListItem[] = rows.map((r) => {
+      const s = scoreOf.get(r.room.id);
+      return {
+        ...toRoomDto(r.room),
+        myRole: r.role,
+        candidateName: candidateOf.get(r.room.id) ?? null,
+        score: s?.score ?? null,
+        testsPassed: s?.passed ?? null,
+        testsTotal: s?.total ?? null,
+      };
+    });
     return c.json(body);
   });
 
@@ -120,13 +178,19 @@ export function roomRoutes(deps: AppDeps) {
     const room = await findRoomBySlug(c.var.db, c.req.param('slug'));
     if (!room) throw notFound('Room not found');
     const [owner] = await c.var.db
-      .select({ name: users.name })
+      .select({
+        name: users.name,
+        companyName: users.companyName,
+        brandLogo: users.brandLogo,
+        brandColor: users.brandColor,
+      })
       .from(users)
       .where(eq(users.id, room.ownerId));
     const body: PublicRoom = {
       title: room.title,
       ownerName: owner?.name ?? 'Interviewer',
       status: room.status,
+      brand: owner ? brandOrNull(toBrand(owner)) : null,
     };
     return c.json(body);
   });
@@ -153,6 +217,7 @@ export function roomRoutes(deps: AppDeps) {
         role,
       },
       collabToken: null,
+      brand: await roomBrand(c.var.db, room.ownerId),
     };
     return c.json(body);
   });
@@ -225,6 +290,7 @@ export function roomRoutes(deps: AppDeps) {
         role: existing?.role ?? participant.role,
       },
       collabToken,
+      brand: await roomBrand(db, room.ownerId),
     };
     return c.json(body);
   });

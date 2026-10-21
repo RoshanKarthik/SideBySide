@@ -27,8 +27,11 @@ export interface Actor {
 const PASSWORD = 'sbs-e2e-pass-1';
 
 function newContext(browser: Browser) {
-  // Clipboard access for pasting code and for the room's copy-link buttons.
-  return browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  // Clipboard access for pasting code and for the room's copy-link buttons; camera and
+  // microphone (fake devices, see playwright.config.ts) for the video call.
+  return browser.newContext({
+    permissions: ['clipboard-read', 'clipboard-write', 'camera', 'microphone'],
+  });
 }
 let counter = 0;
 
@@ -76,7 +79,7 @@ export async function joinAsGuest(actor: Actor, slug: string, title: string) {
   await page.goto(`/r/${slug}`);
   await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible();
   await page.getByLabel('Your name').fill(actor.name);
-  const join = page.getByRole('button', { name: 'Join the room' });
+  const join = page.getByRole('button', { name: 'Continue' });
   await expect(join).toBeDisabled();
   await page.getByText('I understand and agree').click();
   await join.click();
@@ -89,9 +92,19 @@ export function slugFromUrl(page: Page) {
   return match[1]!;
 }
 
-/** Waits until the page has joined the room and synced its shared document. */
+/**
+ * Waits until the page has joined the room and synced its shared document, going through the
+ * lobby (camera and microphone check) with "Join now" when it shows.
+ */
 export async function waitForRoom(page: Page) {
-  await expect.poll(() => page.evaluate(() => window.__sbsRoom?.synced ?? false)).toBe(true);
+  const joinNow = page.getByRole('button', { name: 'Join now' });
+  await expect
+    .poll(async () => {
+      if (await page.evaluate(() => window.__sbsRoom?.synced ?? false)) return true;
+      if (await joinNow.isVisible()) await joinNow.click();
+      return false;
+    })
+    .toBe(true);
 }
 
 export function sharedCode(page: Page, language = 'python') {

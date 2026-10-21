@@ -1,6 +1,6 @@
 import type { DbHandle } from '@sidebyside/db';
 import { createTestDb } from '@sidebyside/db/testing';
-import type { JoinRoomResponse, PublicRoom, RoomEvent } from '@sidebyside/shared';
+import type { JoinRoomResponse, Me, PublicRoom, RoomEvent, RoomListItem } from '@sidebyside/shared';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app';
 import type { AppDeps } from '../context';
@@ -103,6 +103,7 @@ describe('interview room flow', () => {
       title: 'Frontend round – Asha',
       ownerName: 'Priya',
       status: 'scheduled',
+      brand: null,
     });
   });
 
@@ -139,6 +140,41 @@ describe('interview room flow', () => {
 
     const me = await call(`/api/rooms/${slug}/me`, { token: guestToken });
     expect(((await me.json()) as JoinRoomResponse).participant.displayName).toBe('Asha');
+  });
+
+  it("lists the guest candidate on the owner's dashboard", async () => {
+    const res = await call('/api/rooms', { cookie: owner });
+    const [room] = (await res.json()) as RoomListItem[];
+    expect(room).toMatchObject({ id: roomId, candidateName: 'Asha', score: null });
+  });
+
+  it("shows the owner's company branding to candidates", async () => {
+    const logo = 'data:image/png;base64,iVBORw0KGgo=';
+    const patch = await call('/api/me', {
+      method: 'PATCH',
+      cookie: owner,
+      body: JSON.stringify({ brand: { companyName: 'Northwind', logo, color: '#0f766e' } }),
+    });
+    expect(patch.status).toBe(200);
+    expect(((await patch.json()) as Me).brand).toEqual({
+      companyName: 'Northwind',
+      logo,
+      color: '#0f766e',
+    });
+
+    const pub = (await (await call(`/api/rooms/${slug}/public`)).json()) as PublicRoom;
+    expect(pub.brand?.companyName).toBe('Northwind');
+    const me = (await (
+      await call(`/api/rooms/${slug}/me`, { token: guestToken })
+    ).json()) as JoinRoomResponse;
+    expect(me.brand?.color).toBe('#0f766e');
+
+    const svg = await call('/api/me', {
+      method: 'PATCH',
+      cookie: owner,
+      body: JSON.stringify({ brand: { logo: 'data:image/svg+xml;base64,PHN2Zz4=' } }),
+    });
+    expect(svg.status).toBe(400);
   });
 
   it('gives the owner their owner role, not a new candidate row', async () => {

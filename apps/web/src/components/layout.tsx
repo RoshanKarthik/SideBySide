@@ -242,6 +242,13 @@ function UserMenu({
   );
 }
 
+const PUBLIC_NAV = [
+  { href: '/#features', label: 'Features' },
+  { href: '/#how-it-works', label: 'How it works' },
+  { href: '/#practice', label: 'Practice' },
+  { href: '/#trust', label: 'Privacy' },
+];
+
 /** Public pages: a translucent top bar and a footer. */
 export function MarketingShell({
   children,
@@ -254,23 +261,26 @@ export function MarketingShell({
   return (
     <div className="flex min-h-full flex-col">
       <header className="glass sticky top-0 z-30 border-b">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Logo />
-          <nav className="flex items-center gap-1">
-            {!bare && (
-              <>
-                <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
-                  <a href="/#features">Features</a>
-                </Button>
-                <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
-                  <a href="/#how-it-works">How it works</a>
-                </Button>
-              </>
-            )}
+          {!bare && (
+            <nav aria-label="Sections" className="hidden items-center gap-1 md:flex">
+              {PUBLIC_NAV.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </nav>
+          )}
+          <div className="flex items-center gap-1.5">
             <ThemeToggle />
             {session ? (
               <Button size="sm" asChild>
-                <Link to="/dashboard">Open app</Link>
+                <Link to="/dashboard">Open dashboard</Link>
               </Button>
             ) : (
               <>
@@ -284,7 +294,7 @@ export function MarketingShell({
                 )}
               </>
             )}
-          </nav>
+          </div>
         </div>
       </header>
       <main className="flex-1">{children}</main>
@@ -295,19 +305,50 @@ export function MarketingShell({
 
 export function SiteFooter() {
   return (
-    <footer className="border-t">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-muted-foreground">
-        <span className="flex items-center gap-2">
-          <LogoMark className="size-5" /> SideBySide — interviews without screen sharing.
-        </span>
-        <span className="flex gap-5">
-          <Link to="/privacy" className="hover:text-foreground">
-            Privacy
-          </Link>
-          <Link to="/terms" className="hover:text-foreground">
-            Terms
-          </Link>
-        </span>
+    <footer className="border-t bg-card">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-[1.5fr_1fr_1fr] sm:px-6">
+        <div>
+          <Logo />
+          <p className="mt-3 max-w-xs text-sm text-muted-foreground">
+            Video, code, tests, whiteboard and replay for technical interviews — in one link.
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            Product
+          </p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {PUBLIC_NAV.slice(0, 3).map((item) => (
+              <li key={item.href}>
+                <a href={item.href} className="text-foreground/80 hover:text-foreground">
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            Legal
+          </p>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>
+              <Link to="/privacy" className="text-foreground/80 hover:text-foreground">
+                Privacy
+              </Link>
+            </li>
+            <li>
+              <Link to="/terms" className="text-foreground/80 hover:text-foreground">
+                Terms
+              </Link>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div className="border-t">
+        <p className="mx-auto max-w-6xl px-4 py-4 text-xs text-muted-foreground sm:px-6">
+          © {new Date().getFullYear()} SideBySide
+        </p>
       </div>
     </footer>
   );

@@ -80,8 +80,11 @@ function SessionBody({ s }: { s: SessionSummary }) {
   const runs = s.rounds.reduce((n, r) => n + r.runs.total, 0);
   const okRuns = s.rounds.reduce((n, r) => n + r.runs.ok, 0);
   const tests = s.rounds.flatMap((r) => r.tests);
+  // Weighted score when the run has one; older runs fall back to the share of tests passed.
+  const scoreOf = (t: (typeof tests)[number]) =>
+    t.score ?? Math.floor((t.passed / Math.max(1, t.total)) * 100);
   const best = tests.reduce<(typeof tests)[number] | null>(
-    (b, t) => (!b || t.passed / Math.max(1, t.total) > b.passed / Math.max(1, b.total) ? t : b),
+    (b, t) => (!b || scoreOf(t) > scoreOf(b) ? t : b),
     null,
   );
   const start = Date.parse(s.room.startedAt ?? s.room.createdAt);
@@ -142,8 +145,9 @@ function SessionBody({ s }: { s: SessionSummary }) {
         />
         <Metric
           icon={FlaskConical}
-          label="Best test run"
-          value={best ? `${best.passed} / ${best.total}` : '—'}
+          label="Best test score"
+          value={best ? `${scoreOf(best)} / 100` : '—'}
+          hint={best ? `${best.passed} of ${best.total} tests passed` : undefined}
           tone={best ? (best.passed === best.total ? 'ok' : 'warn') : undefined}
         />
       </div>
@@ -335,7 +339,7 @@ function Timeline({ round, start }: { round: SessionSummary['rounds'][number]; s
     ...round.tests.map((t) => ({
       ts: t.ts,
       icon: t.passed === t.total ? CheckCircle2 : XCircle,
-      text: `Tests in ${LANGUAGE_INFO[t.language].label}: ${t.passed} / ${t.total} passed`,
+      text: `Tests in ${LANGUAGE_INFO[t.language].label}: ${t.passed} / ${t.total} passed${t.score !== null ? ` · score ${t.score}` : ''}`,
       tone: t.passed === t.total ? 'ok' : 'error',
     })),
   ].sort((a, b) => a.ts - b.ts);

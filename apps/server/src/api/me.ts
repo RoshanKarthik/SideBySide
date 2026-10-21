@@ -22,6 +22,7 @@ import { getSessionUser } from '../auth/identity';
 import type { AppDeps, AppEnv } from '../context';
 import { badRequest, notFound, unauthorized } from '../lib/errors';
 import { parseBody } from '../lib/validate';
+import { toBrand } from '../lib/serialize';
 import { purgeRoomDocuments } from './sessions';
 
 export function meRoutes(deps: AppDeps) {
@@ -48,6 +49,11 @@ export function meRoutes(deps: AppDeps) {
         ...(input.displayName !== undefined && { name: input.displayName }),
         ...(input.defaultLanguage !== undefined && { defaultLanguage: input.defaultLanguage }),
         ...(input.lowBandwidth !== undefined && { lowBandwidth: input.lowBandwidth }),
+        ...(input.brand?.companyName !== undefined && {
+          companyName: input.brand.companyName || null,
+        }),
+        ...(input.brand?.logo !== undefined && { brandLogo: input.brand.logo }),
+        ...(input.brand?.color !== undefined && { brandColor: input.brand.color }),
       })
       .where(eq(users.id, session.id))
       .returning();
@@ -175,5 +181,6 @@ function toMe(row: typeof users.$inferSelect): Me {
     avatarUrl: row.image,
     defaultLanguage: row.defaultLanguage,
     lowBandwidth: row.lowBandwidth,
+    brand: toBrand(row),
   };
 }

@@ -10,11 +10,10 @@ const buttonVariants = cva(
       variant: {
         default:
           'bg-primary text-primary-foreground shadow-[inset_0_1px_0_0_rgb(255_255_255/0.18),0_1px_2px_0_rgb(0_0_0/0.25)] hover:bg-primary/90',
-        /** Brand gradient with a glow; for the one main call to action on a page. */
-        glow: 'bg-brand-gradient text-white shadow-[inset_0_1px_0_0_rgb(255_255_255/0.25),0_8px_24px_-8px_var(--glow)] hover:brightness-110',
+        /** The one main call to action on a page: primary with a lifted shadow. */
+        glow: 'bg-primary text-primary-foreground shadow-[inset_0_1px_0_0_rgb(255_255_255/0.18),0_6px_18px_-6px_var(--glow)] hover:bg-primary/90',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/75',
-        outline:
-          'border border-input bg-background/40 shadow-xs hover:border-foreground/20 hover:bg-muted',
+        outline: 'border border-input bg-card shadow-xs hover:border-foreground/20 hover:bg-muted',
         ghost: 'text-foreground/80 hover:bg-muted hover:text-foreground',
         destructive:
           'bg-destructive text-destructive-foreground shadow-[inset_0_1px_0_0_rgb(255_255_255/0.15)] hover:bg-destructive/90',

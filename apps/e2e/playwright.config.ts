@@ -24,6 +24,10 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
     // Wide enough for the interviewer panel to sit next to the room.
     viewport: { width: 1440, height: 900 },
+    // A synthetic camera and microphone, granted without a prompt, for the video call.
+    launchOptions: {
+      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+    },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
