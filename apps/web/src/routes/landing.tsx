@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   Code2,
   EyeOff,
   History,
@@ -12,12 +11,12 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { MarketingShell } from '@/components/layout';
+import { LogoMark } from '@/components/layout';
+import { CinematicHero } from '@/components/marketing/cinematic-hero';
 import { ProductPreview } from '@/components/marketing/product-preview';
-import { HeroGlow, Reveal } from '@/components/marketing/reveal';
-import { Button } from '@/components/ui/button';
+import { Reveal } from '@/components/marketing/reveal';
 import { useSession } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
 
@@ -51,8 +50,8 @@ const FEATURES = [
   {
     icon: ShieldCheck,
     title: 'Transparent by design',
-    body: 'Everyone sees the same integrity signals. Signals, never verdicts.',
-    span: 'md:col-span-2',
+    body: 'Everyone sees the same activity signals. Signals, never verdicts.',
+    span: 'md:col-span-3',
   },
 ];
 
@@ -81,107 +80,103 @@ const STATS = [
   { icon: Sparkles, label: 'Free, no card needed' },
 ];
 
+/** Section heading in the hero's voice: a small label, then a serif title. */
+function Heading({
+  eyebrow,
+  children,
+  center,
+}: {
+  eyebrow: string;
+  children: ReactNode;
+  center?: boolean;
+}) {
+  return (
+    <div className={cn('max-w-2xl', center && 'mx-auto text-center')}>
+      <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">{eyebrow}</p>
+      <h2 className="font-display mt-4 text-4xl leading-[1.05] tracking-[-1px] sm:text-6xl">
+        {children}
+      </h2>
+    </div>
+  );
+}
+
+function GlassLink({ to, children, large }: { to: string; children: ReactNode; large?: boolean }) {
+  return (
+    <Link
+      to={to}
+      viewTransition
+      className={cn(
+        'liquid-glass inline-flex rounded-full text-foreground transition-transform duration-300 hover:scale-[1.03]',
+        large ? 'px-12 py-4 text-base' : 'px-7 py-3 text-sm',
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export default function LandingPage() {
   const { data: session } = useSession();
-  const reduced = useReducedMotion();
   const start = session ? '/dashboard?new=1' : '/login?mode=signup';
+  const practice = session ? '/practice' : '/login?next=/practice';
 
   return (
-    <MarketingShell>
-      {/* Hero */}
-      <section className="relative isolate overflow-hidden">
-        <HeroGlow />
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-16 pb-20 sm:pt-24 lg:grid-cols-[1.05fr_1fr]">
-          <div>
-            <motion.div
-              initial={reduced ? false : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 rounded-full border bg-card/60 px-3 py-1 text-xs text-muted-foreground backdrop-blur"
-            >
-              <span className="size-1.5 rounded-full bg-success" />
-              No screen sharing. No installs. Works on 3G.
-            </motion.div>
-            <motion.h1
-              initial={reduced ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.05 }}
-              className="mt-6 text-4xl leading-[1.05] font-semibold tracking-tight sm:text-6xl"
-            >
-              Technical interviews,
-              <br />
-              <span className="text-gradient">side by side.</span>
-            </motion.h1>
-            <motion.p
-              initial={reduced ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.12 }}
-              className="mt-6 max-w-xl text-lg text-muted-foreground"
-            >
-              One link opens a live room with shared notes, a code editor that actually runs code,
-              hidden tests and a whiteboard. Every keystroke is replayable afterwards.
-            </motion.p>
-            <motion.div
-              initial={reduced ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="mt-8 flex flex-wrap gap-3"
-            >
-              <Button size="lg" variant="glow" asChild>
-                <Link to={start}>
-                  Start an interview <ArrowRight />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link to={session ? '/practice' : '/login?next=/practice'}>
-                  Practise with a peer
-                </Link>
-              </Button>
-            </motion.div>
-          </div>
-          <motion.div
-            initial={reduced ? false : { opacity: 0, y: 24, rotateX: 8 }}
-            animate={{ opacity: 1, y: 0, rotateX: 0 }}
-            transition={{ duration: 0.8, delay: 0.15, ease: [0.2, 0.7, 0.2, 1] }}
-            style={{ perspective: 1200 }}
-            className="relative"
-          >
-            <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(closest-side,var(--glow),transparent)] blur-xl" />
-            <ProductPreview />
-          </motion.div>
-        </div>
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4">
-          {STATS.map(({ icon: Icon, label }) => (
-            <div
-              key={label}
-              className="flex items-center justify-center gap-2 bg-background px-4 py-4 text-sm text-muted-foreground"
-            >
-              <Icon className="size-4 text-primary" /> {label}
+    <div className="cinematic cinematic-page flex min-h-full flex-col">
+      <CinematicHero />
+
+      {/* The product, up close */}
+      <section className="relative">
+        <div className="mx-auto grid max-w-6xl items-center gap-14 px-6 pt-16 pb-24 lg:grid-cols-[1fr_1.15fr]">
+          <Reveal>
+            <Heading eyebrow="See it in action">
+              Interviews, <em className="text-muted-foreground not-italic">side by side.</em>
+            </Heading>
+            <p className="mt-6 max-w-lg leading-relaxed text-muted-foreground">
+              Both of you type in the same editor with live cursors. Run the code, run the hidden
+              tests, sketch the design, and replay all of it afterwards.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center gap-6">
+              <GlassLink to={start}>Start an interview</GlassLink>
+              <Link
+                to={practice}
+                viewTransition
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Practise with a peer →
+              </Link>
             </div>
-          ))}
+          </Reveal>
+          <Reveal delay={0.1}>
+            <ProductPreview className="liquid-glass border-0 bg-white/[0.03] shadow-2xl shadow-black/40" />
+          </Reveal>
         </div>
+        <Reveal className="mx-auto max-w-6xl px-6">
+          <ul className="liquid-glass grid grid-cols-2 rounded-2xl sm:grid-cols-4">
+            {STATS.map(({ icon: Icon, label }) => (
+              <li
+                key={label}
+                className="flex items-center justify-center gap-2 px-4 py-5 text-sm text-muted-foreground"
+              >
+                <Icon className="size-4 text-foreground/80" /> {label}
+              </li>
+            ))}
+          </ul>
+        </Reveal>
       </section>
 
       {/* Features */}
-      <section id="features" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24">
-        <Reveal className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-medium text-primary">Everything in one room</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            What a good interview actually needs
-          </h2>
-          <p className="mt-4 text-muted-foreground">
-            Built for the hour you spend with a candidate — and the decision afterwards.
-          </p>
+      <section id="features" className="mx-auto w-full max-w-6xl scroll-mt-8 px-6 py-28">
+        <Reveal>
+          <Heading eyebrow="Everything in one room" center>
+            What a good interview <em className="text-muted-foreground not-italic">needs.</em>
+          </Heading>
         </Reveal>
-        <div className="mt-14 grid gap-4 md:grid-cols-3">
+        <div className="mt-16 grid gap-4 md:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, body, span }, i) => (
-            <Reveal key={title} delay={i * 0.05} className={cn(span)}>
-              <div className="card-glow group relative h-full overflow-hidden rounded-2xl border bg-card p-6">
-                <div className="absolute -top-16 -right-16 size-40 rounded-full bg-[radial-gradient(closest-side,var(--glow),transparent)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="flex size-10 items-center justify-center rounded-lg border bg-background">
-                  <Icon className="size-5 text-primary" />
-                </div>
-                <h3 className="mt-5 font-semibold">{title}</h3>
+            <Reveal key={title} delay={i * 0.06} className={cn(span)}>
+              <div className="liquid-glass glass-card h-full rounded-2xl p-7">
+                <Icon className="size-5 text-foreground/80" />
+                <h3 className="font-display mt-6 text-2xl tracking-[-0.3px]">{title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
               </div>
             </Reveal>
@@ -190,49 +185,64 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="relative scroll-mt-20 border-y bg-card/30 py-24">
-        <div className="mx-auto max-w-6xl px-4">
-          <Reveal className="max-w-2xl">
-            <p className="text-sm font-medium text-primary">How it works</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-              From link to decision in three steps
-            </h2>
-          </Reveal>
-          <ol className="mt-12 grid gap-6 md:grid-cols-3">
-            {STEPS.map(({ icon: Icon, title, body }, i) => (
-              <Reveal key={title} delay={i * 0.08}>
-                <li className="relative h-full rounded-2xl border bg-background p-6">
-                  <span className="font-mono text-xs text-muted-foreground">0{i + 1}</span>
-                  <Icon className="mt-4 size-6 text-primary" />
-                  <h3 className="mt-4 font-semibold">{title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-                </li>
-              </Reveal>
-            ))}
-          </ol>
-        </div>
+      <section id="how-it-works" className="mx-auto w-full max-w-6xl scroll-mt-8 px-6 py-24">
+        <Reveal>
+          <Heading eyebrow="How it works">
+            From link to decision,{' '}
+            <em className="text-muted-foreground not-italic">in three steps.</em>
+          </Heading>
+        </Reveal>
+        <ol className="mt-16 grid gap-10 md:grid-cols-3">
+          {STEPS.map(({ icon: Icon, title, body }, i) => (
+            <Reveal key={title} delay={i * 0.08}>
+              <li className="border-t border-white/15 pt-6">
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <span className="font-display text-3xl text-foreground">0{i + 1}</span>
+                  <Icon className="size-4" />
+                </div>
+                <h3 className="font-display mt-4 text-2xl tracking-[-0.3px]">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
+              </li>
+            </Reveal>
+          ))}
+        </ol>
       </section>
 
-      {/* Call to action */}
-      <section className="mx-auto max-w-6xl px-4 py-24">
+      {/* Closing call to action */}
+      <section className="mx-auto w-full max-w-6xl px-6 pt-12 pb-32 text-center">
         <Reveal>
-          <div className="relative isolate overflow-hidden rounded-3xl border bg-card px-6 py-16 text-center sm:px-16">
-            <div className="bg-dots mask-radial absolute inset-0 -z-10 opacity-60" />
-            <div className="absolute -bottom-32 left-1/2 -z-10 h-64 w-[640px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,var(--glow),transparent)] blur-2xl" />
-            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Run your next interview <span className="text-gradient">side by side</span>
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-              Free to use. Candidates join without an account.
-            </p>
-            <Button size="lg" variant="glow" className="mt-8" asChild>
-              <Link to={start}>
-                Create your first room <ArrowRight />
-              </Link>
-            </Button>
+          <h2 className="font-display mx-auto max-w-4xl text-5xl leading-[0.95] tracking-[-2px] sm:text-7xl">
+            Run your next interview{' '}
+            <em className="text-muted-foreground not-italic">side by side.</em>
+          </h2>
+          <p className="mx-auto mt-6 max-w-xl text-muted-foreground">
+            Free to use. Candidates join without an account.
+          </p>
+          <div className="mt-12">
+            <GlassLink to={start} large>
+              Create your first room
+            </GlassLink>
           </div>
         </Reveal>
       </section>
-    </MarketingShell>
+
+      <footer className="border-t border-white/10">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-8 text-xs text-muted-foreground">
+          <span className="flex items-center gap-2">
+            <LogoMark className="size-5" />
+            <span className="font-display text-base text-foreground">SideBySide</span> — interviews
+            without screen sharing.
+          </span>
+          <span className="flex gap-6">
+            <Link to="/privacy" viewTransition className="hover:text-foreground">
+              Privacy
+            </Link>
+            <Link to="/terms" viewTransition className="hover:text-foreground">
+              Terms
+            </Link>
+          </span>
+        </div>
+      </footer>
+    </div>
   );
 }

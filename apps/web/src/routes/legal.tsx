@@ -1,16 +1,39 @@
-import { AppShell } from '@/components/layout';
+import '@fontsource/instrument-serif/400.css';
+import '@/components/marketing/cinematic.css';
+import { ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router';
 
+/** Privacy and Terms, in the same cinematic style as the landing page they're linked from. */
 function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <AppShell>
-      <article className="mx-auto max-w-2xl space-y-4 px-4 py-12 text-sm leading-relaxed">
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <p className="rounded-md bg-muted px-3 py-2 text-muted-foreground">
+    <div className="cinematic min-h-full">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-8 py-6">
+        <Link
+          to="/"
+          viewTransition
+          className="font-display text-3xl tracking-tight text-foreground"
+          aria-label="SideBySide home"
+        >
+          SideBySide
+        </Link>
+        <Link
+          to="/"
+          viewTransition
+          className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Back home
+        </Link>
+      </nav>
+      <article className="animate-fade-rise mx-auto max-w-2xl space-y-5 px-6 pt-12 pb-24 leading-relaxed text-foreground/85">
+        <h1 className="font-display text-6xl leading-none tracking-[-1.5px] text-foreground">
+          {title}
+        </h1>
+        <p className="liquid-glass rounded-xl px-4 py-3 text-sm text-muted-foreground">
           Placeholder text. Have this page reviewed before a public launch.
         </p>
         {children}
       </article>
-    </AppShell>
+    </div>
   );
 }
 

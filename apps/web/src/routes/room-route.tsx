@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
-import { MarketingShell } from '@/components/layout';
 import { AuthLayout } from '@/components/marketing/auth-layout';
+import { BackgroundVideo } from '@/components/marketing/cinematic-hero';
 import { Button } from '@/components/ui/button';
 import { Badge, ErrorNote, Spinner } from '@/components/ui/card';
 import { Checkbox, Field, Input, Label } from '@/components/ui/form';
@@ -76,16 +76,18 @@ export default function RoomRoute() {
 
 function EndedNotice({ title }: { title: string }) {
   return (
-    <MarketingShell bare>
-      <div className="relative isolate mx-auto flex max-w-md flex-col items-center px-4 py-28 text-center">
-        <div className="bg-dots mask-radial absolute inset-0 -z-10 opacity-60" />
-        <div className="flex size-12 items-center justify-center rounded-2xl border bg-card">
-          <Flag className="size-5 text-primary" />
+    <div className="cinematic relative isolate flex min-h-full flex-col items-center justify-center overflow-hidden px-6 text-center">
+      <BackgroundVideo className="opacity-60" />
+      <div className="animate-fade-rise relative z-10">
+        <div className="liquid-glass mx-auto flex size-12 items-center justify-center rounded-full">
+          <Flag className="size-5" />
         </div>
-        <h1 className="mt-5 text-2xl font-semibold">{title}</h1>
-        <p className="mt-2 text-muted-foreground">This session has ended. Thanks for joining.</p>
+        <h1 className="font-display mt-6 text-5xl leading-none tracking-[-1px] sm:text-6xl">
+          {title}
+        </h1>
+        <p className="mt-4 text-muted-foreground">This session has ended. Thanks for joining.</p>
       </div>
-    </MarketingShell>
+    </div>
   );
 }
 
@@ -93,7 +95,7 @@ function EndedNotice({ title }: { title: string }) {
 function RoomAside({ room, children }: { room: PublicRoom; children?: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-md">
-      <div className="rounded-2xl border bg-card/80 p-6 shadow-2xl shadow-black/30 backdrop-blur">
+      <div className="liquid-glass rounded-2xl bg-black/30 p-6 shadow-2xl shadow-black/40 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <Avatar name={room.ownerName} size={40} />
           <div className="min-w-0">
@@ -104,19 +106,19 @@ function RoomAside({ room, children }: { room: PublicRoom; children?: ReactNode 
             {room.status === 'live' ? '● Live now' : 'Waiting to start'}
           </Badge>
         </div>
-        <h2 className="mt-5 text-xl font-semibold tracking-tight">{room.title}</h2>
+        <h2 className="font-display mt-5 text-3xl tracking-[-0.5px]">{room.title}</h2>
         {children}
       </div>
-      <ul className="mt-8 space-y-4 text-sm">
+      <ul className="liquid-glass mt-6 space-y-4 rounded-2xl bg-black/30 p-5 text-sm backdrop-blur-md">
         {[
           { icon: Code2, text: 'Shared notes, a code editor that runs code, and a whiteboard.' },
           { icon: History, text: 'Edits, code runs and tab switches are recorded for replay.' },
           { icon: Eye, text: 'You see the same activity signals the interviewer sees.' },
           { icon: EyeOff, text: 'No audio, video or screen recording. IP addresses are not kept.' },
         ].map(({ icon: Icon, text }) => (
-          <li key={text} className="flex items-start gap-3 text-muted-foreground">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border bg-background">
-              <Icon className="size-3.5 text-primary" />
+          <li key={text} className="flex items-start gap-3 text-foreground/85">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/10">
+              <Icon className="size-3.5" />
             </span>
             <span className="pt-1">{text}</span>
           </li>
@@ -162,7 +164,9 @@ function CoInterviewerInvite({
       <div className="flex size-11 items-center justify-center rounded-xl border bg-card">
         <UserPlus className="size-5 text-primary" />
       </div>
-      <h1 className="mt-5 text-2xl font-semibold tracking-tight">Join as co-interviewer</h1>
+      <h1 className="font-display mt-5 text-5xl leading-none tracking-[-1px]">
+        Join as co-interviewer
+      </h1>
       <p className="mt-2 text-sm text-muted-foreground">
         {room.ownerName} invited you to interview with them in <strong>{room.title}</strong>.
       </p>
@@ -223,7 +227,7 @@ function JoinForm({ slug, room }: { slug: string; room: PublicRoom }) {
   return (
     <AuthLayout aside={<RoomAside room={room} />}>
       <p className="text-sm text-muted-foreground">{room.ownerName} invited you to</p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">{room.title}</h1>
+      <h1 className="font-display mt-2 text-5xl leading-none tracking-[-1px]">{room.title}</h1>
       <form onSubmit={submit} className="mt-8 space-y-5">
         <Field label="Your name" htmlFor="name" hint="Shown to everyone in the room.">
           <Input
@@ -261,13 +265,7 @@ function JoinForm({ slug, room }: { slug: string; room: PublicRoom }) {
           </div>
         </div>
         {join.error && <ErrorNote>{join.error.message}</ErrorNote>}
-        <Button
-          type="submit"
-          size="lg"
-          variant="glow"
-          className="w-full"
-          disabled={!consent || join.isPending}
-        >
+        <Button type="submit" size="lg" className="w-full" disabled={!consent || join.isPending}>
           {join.isPending ? <Spinner /> : null}
           Join the room
           {!join.isPending && <ArrowRight />}

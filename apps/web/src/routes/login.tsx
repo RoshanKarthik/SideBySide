@@ -39,7 +39,7 @@ export default function LoginPage() {
 
   return (
     <AuthLayout>
-      <h1 className="text-2xl font-semibold tracking-tight">
+      <h1 className="font-display text-5xl leading-none tracking-[-1px]">
         {signUp ? 'Create your account' : 'Welcome back'}
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
