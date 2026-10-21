@@ -24,6 +24,12 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
   room sees — signals, never verdicts.
 - When the interviewer ends the session, a session summary (rubric, timeline, test results,
   signals) and a replay of notes, code and whiteboard with markers for every key moment.
+- **Keep your feedback:** when the interviewer shares the replay or report, a guest candidate
+  can save the ended session to an account (sign up or sign in) from the "Session ended" screen
+  and open it later from their dashboard.
+- **Retention:** each room is deleted for good once its retention period (7, 30 or 90 days
+  after the session ends) is over. A daily Cron Trigger purges the room's Durable Object
+  documents, then its Postgres rows.
 - **Practice with a peer:** matchmaking by topic, difficulty and language, two rounds with a
   role swap, and ratings afterwards.
 - Dashboard with a candidates table (score, duration, status), live and upcoming rooms, stats
@@ -138,6 +144,9 @@ docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=
 | `pnpm db:migrate`  | Apply migrations to `DATABASE_URL`                 |
 | `pnpm db:seed`     | Load (or refresh) the public question bank         |
 
+To run the daily retention cleanup by hand while `pnpm dev` is running:
+`curl "http://localhost:8787/cdn-cgi/handler/scheduled"`.
+
 ### End-to-end tests
 
 `apps/e2e` drives the three acceptance flows in Chromium with Playwright: an interview with a
@@ -210,6 +219,8 @@ each step. The tests are not part of `pnpm test`.
 - `ALLOW_DEV_LOGIN` is `"false"` and the secrets are long random values.
 - `PUBLIC_APP_URL` matches the deployed origin; OAuth callback URLs match it too.
 - Migrations have been applied to the production branch.
+- The retention Cron Trigger (`30 3 * * *`, from `wrangler.jsonc`) shows under the Worker's
+  Settings → Triggers. Cron Triggers are included in the free plan.
 - The Privacy and Terms pages contain reviewed text. They are placeholders today; have them
   reviewed (for example against India's Digital Personal Data Protection Act) before a public
   launch.
@@ -234,6 +245,9 @@ each step. The tests are not part of `pnpm test`.
 - The HTML/CSS/JS preview runs in an iframe sandbox without `allow-same-origin`, so the page
   can't reach the app's cookies, storage or DOM.
 - Company logos are stored as small PNG, JPEG or WebP data URLs (SVG is refused).
+- A guest's claim token is derived from their seat with a server secret, stored only as a
+  SHA-256 hash, and cleared once used. Claiming needs a signed-in account that isn't already in
+  the room, and is refused if the interviewer no longer shares anything with the candidate.
 
 ## Known limitations
 
@@ -247,3 +261,10 @@ each step. The tests are not part of `pnpm test`.
   corporate networks need a TURN relay (for example Cloudflare's), which isn't set up yet. Calls
   are a mesh, so they suit interviews of two to four people, not large meetings.
 - Sign-in by email link isn't available (it needs an email sender and a domain).
+- Retention cleanup runs once a day (03:30 UTC) and deletes at most 100 rooms per run, so a
+  room can outlive its `delete_after` date by up to a day, longer if there is a backlog. A room
+  whose documents can't be purged keeps its row and is retried on the next run.
+- A guest can claim a session only from the browser they used for the interview (the claim
+  token is kept in that browser's storage, not in a link), and only after it has ended.
+- Candidate feedback reports aren't generated yet, so a claimed session where only the report
+  is shared has nothing to open until reports exist.
