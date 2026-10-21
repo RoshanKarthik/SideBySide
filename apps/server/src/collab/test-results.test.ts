@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { buildTestRuns, type StoredTest } from './test-results';
 
 const tests: StoredTest[] = [
-  { id: 'v1', stdin: '1 2', expectedStdout: '3', isHidden: false },
-  { id: 'h1', stdin: 'SECRET-INPUT', expectedStdout: 'SECRET-EXPECTED', isHidden: true },
-  { id: 'h2', stdin: 'SECRET-2', expectedStdout: '42', isHidden: true },
+  { id: 'v1', stdin: '1 2', expectedStdout: '3', isHidden: false, weight: 1 },
+  { id: 'h1', stdin: 'SECRET-INPUT', expectedStdout: 'SECRET-EXPECTED', isHidden: true, weight: 2 },
+  { id: 'h2', stdin: 'SECRET-2', expectedStdout: '42', isHidden: true, weight: 1 },
 ];
 const ctx = {
   requestId: 'r1',
@@ -30,6 +30,12 @@ describe('buildTestRuns', () => {
     expect(full.results.map((r) => r.status)).toEqual(['passed', 'failed', 'error']);
     expect(full.passed).toBe(1);
     expect(full.total).toBe(3);
+  });
+
+  it('scores by test weight', () => {
+    // 1 of 4 weight points passed.
+    expect(full.score).toBe(25);
+    expect(candidate.score).toBe(25);
   });
 
   it('gives interviewers everything', () => {

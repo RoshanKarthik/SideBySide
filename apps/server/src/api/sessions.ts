@@ -118,6 +118,8 @@ export function sessionRoutes(deps: AppDeps) {
             ts: e.serverTs.getTime(),
             passed: num(e.payload.passed),
             total: num(e.payload.total),
+            // Test runs recorded before scores existed have none.
+            score: typeof e.payload.score === 'number' ? e.payload.score : null,
             language: (e.payload.language as Lang) ?? 'python',
           })),
           rubric: mine

@@ -1,17 +1,23 @@
 # SideBySide
 
-Live technical interviews from one link. The interviewer and candidate share a room with
-**collaborative notes** and a **real code editor that runs code**, without screen sharing. Every
-edit is recorded with a server timestamp, so the whole session can be **replayed** afterwards.
+Live technical interviews from one link. The interviewer and candidate share a room with a
+**video call**, **collaborative notes** and a **real code editor that runs code**, without screen
+sharing. Every edit is recorded with a server timestamp, so the whole session can be
+**replayed** afterwards.
 
 - Interviewers sign in (Google or GitHub) and create a room.
 - Candidates open the link, enter their name, accept the recording notice and join. No account.
+- A lobby checks camera and microphone (with device pickers and a level meter) before anyone
+  enters. In the room, a peer-to-peer video call floats over the corner with camera, mute,
+  device settings and leave controls; calls are never recorded.
 - Notes and code sync live, with everyone's cursors and presence.
 - Python, JavaScript and TypeScript run in the browser in a sandboxed WebAssembly worker.
+  HTML/CSS/JS renders in a live, sandboxed preview with its console output.
 - A shared whiteboard (Design tab) with live pointers and starter templates.
 - Interviewers keep a question bank (their own questions plus a public practice bank) with
   starter code, hints and test cases. **Show to candidate** loads the problem and starter code;
-  **Run tests** reports pass/fail, and candidates never see the contents of hidden tests.
+  **Run tests** reports pass/fail and a score out of 100 weighted by each test's weight, and
+  candidates never see the contents of hidden tests.
 - A private interviewer panel: private notes with one-click timestamps, a rubric, a timer, an
   editor lock and a co-interviewer invite link.
 - Transparent activity signals (pastes, tab switches, leaving the window) that everyone in the
@@ -20,8 +26,11 @@ edit is recorded with a server timestamp, so the whole session can be **replayed
   signals) and a replay of notes, code and whiteboard with markers for every key moment.
 - **Practice with a peer:** matchmaking by topic, difficulty and language, two rounds with a
   role swap, and ratings afterwards.
-- Dashboard with stats and search, a command palette (Ctrl+K), settings with a low-bandwidth
-  mode, data export and account deletion. Dark and light themes.
+- Dashboard with a candidates table (score, duration, status), live and upcoming rooms, stats
+  and search; a command palette (Ctrl+K); settings with company branding (name, logo and colour
+  shown to candidates on join pages and in rooms), a low-bandwidth mode, data export and account
+  deletion. Light theme by default, dark as an option. The landing page opens with a cinematic
+  video hero, and every page change cross-fades (view transitions).
 
 ## Stack
 
@@ -34,7 +43,8 @@ edit is recorded with a server timestamp, so the whole session can be **replayed
 | Auth           | Better Auth (Google + GitHub), room-scoped JWTs for guests                  |
 | API            | Hono + zod                                                                  |
 | Web            | React 19, Vite, React Router, TanStack Query, Tailwind CSS 4, Radix UI      |
-| UI             | Geist fonts, cmdk command palette, sonner toasts, Motion (marketing pages)  |
+| UI             | Geist + Instrument Serif (self-hosted), cmdk palette, sonner toasts         |
+| Video call     | WebRTC mesh between browsers, signalled through the room's Durable Object   |
 | Editors        | Monaco + `y-monaco` (code), TipTap + Yjs (notes)                            |
 | Whiteboard     | Excalidraw, synced through the room's Yjs document                          |
 | Code execution | Pyodide (Python) and a JS/TS runner in a locked-down Web Worker             |
@@ -132,7 +142,8 @@ docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=
 `apps/e2e` drives the three acceptance flows in Chromium with Playwright: an interview with a
 guest candidate (consent, Show to candidate, Run, Run tests with hidden tests, private notes and
 rubric, End session, replay), practice matchmaking with a role swap and ratings, and a candidate
-who keeps typing for 40 seconds offline and merges on reconnect. Each person has their own
+who keeps typing for 40 seconds offline and merges on reconnect. A fourth test runs a video call
+between interviewer and candidate with Chromium's fake camera and microphone. Each person has their own
 browser context, and signed-in users are fresh accounts made through the development sign-in,
 so runs don't depend on earlier data.
 
@@ -216,6 +227,12 @@ each step. The tests are not part of `pnpm test`.
   removed before the code starts. In production the worker script is also served with a
   Content-Security-Policy that only allows loading Pyodide from the app's own origin.
 - IP addresses are not stored.
+- Video calls are peer to peer: the room only relays the connection setup between call
+  participants (a tab's call id can't be taken over by another connection), and audio and video
+  never pass through or get stored by the server.
+- The HTML/CSS/JS preview runs in an iframe sandbox without `allow-same-origin`, so the page
+  can't reach the app's cookies, storage or DOM.
+- Company logos are stored as small PNG, JPEG or WebP data URLs (SVG is refused).
 
 ## Known limitations
 
@@ -225,4 +242,7 @@ each step. The tests are not part of `pnpm test`.
   run's output. Tests run in an interviewer's browser (which already holds the hidden tests), so
   **Run tests** needs an interviewer in the room.
 - Images can't be added to the whiteboard.
+- Video calls use public STUN servers only. Most networks connect directly, but some strict
+  corporate networks need a TURN relay (for example Cloudflare's), which isn't set up yet. Calls
+  are a mesh, so they suit interviews of two to four people, not large meetings.
 - Sign-in by email link isn't available (it needs an email sender and a domain).

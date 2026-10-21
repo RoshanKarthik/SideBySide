@@ -10,12 +10,14 @@ import {
 } from '@sidebyside/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  ArrowDownUp,
   BookOpen,
   CalendarClock,
   Check,
   Clock,
   Copy,
   FileText,
+  Gauge,
   History,
   MoreHorizontal,
   Plus,
@@ -25,7 +27,8 @@ import {
   Users,
 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
+import { Link, useNavigate } from '@/lib/navigation';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,6 +43,7 @@ import {
 } from '@/components/ui/card';
 import { Checkbox, Field, Input, Label, NativeSelect } from '@/components/ui/form';
 import {
+  Avatar,
   Dialog,
   DialogClose,
   DialogContent,
@@ -60,11 +64,15 @@ const FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'live', label: 'Live' },
   { id: 'scheduled', label: 'Upcoming' },
-  { id: 'ended', label: 'Ended' },
+  { id: 'ended', label: 'Completed' },
 ];
+
+type SortKey = 'date' | 'score' | 'candidate';
 
 const durationOf = (r: RoomListItem) =>
   r.startedAt && r.endedAt ? Date.parse(r.endedAt) - Date.parse(r.startedAt) : 0;
+
+const dateOf = (r: RoomListItem) => Date.parse(r.endedAt ?? r.startedAt ?? r.createdAt);
 
 function greeting() {
   const h = new Date().getHours();
@@ -76,6 +84,7 @@ export function DashboardPage() {
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('all');
+  const [sort, setSort] = useState<SortKey>('date');
   const [now] = useState(() => Date.now());
   const rooms = useQuery({
     queryKey: ['rooms'],
@@ -87,11 +96,15 @@ export function DashboardPage() {
     const list = rooms.data ?? [];
     const monthAgo = now - 30 * 24 * 3600 * 1000;
     const ended = list.filter((r) => r.status === 'ended');
+    const scored = list.filter((r) => r.score !== null && r.mode === 'interview');
     return {
       live: list.filter((r) => r.status === 'live').length,
-      month: list.filter((r) => Date.parse(r.createdAt) > monthAgo).length,
-      time: ended.reduce((s, r) => s + durationOf(r), 0),
-      practice: list.filter((r) => r.mode === 'practice').length,
+      month: list.filter((r) => r.mode === 'interview' && Date.parse(r.createdAt) > monthAgo)
+        .length,
+      avgScore: scored.length
+        ? Math.round(scored.reduce((sum, r) => sum + (r.score ?? 0), 0) / scored.length)
+        : null,
+      time: ended.reduce((sum, r) => sum + durationOf(r), 0),
     };
   }, [rooms.data, now]);
 
@@ -99,9 +112,23 @@ export function DashboardPage() {
   if (!session) return <Navigate to="/login?next=/dashboard" replace />;
 
   const q = query.trim().toLowerCase();
-  const visible = (rooms.data ?? []).filter(
-    (r) => (filter === 'all' || r.status === filter) && (!q || r.title.toLowerCase().includes(q)),
-  );
+  const all = rooms.data ?? [];
+  const active = all.filter((r) => r.status !== 'ended');
+  const visible = all
+    .filter(
+      (r) =>
+        (filter === 'all' || r.status === filter) &&
+        (!q ||
+          r.title.toLowerCase().includes(q) ||
+          (r.candidateName ?? '').toLowerCase().includes(q)),
+    )
+    .sort((a, b) =>
+      sort === 'score'
+        ? (b.score ?? -1) - (a.score ?? -1)
+        : sort === 'candidate'
+          ? (a.candidateName ?? '~').localeCompare(b.candidateName ?? '~')
+          : dateOf(b) - dateOf(a),
+    );
   const firstName = session.user.name.split(' ')[0];
 
   return (
@@ -109,7 +136,7 @@ export function DashboardPage() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10">
         <PageHeader
           title={`${greeting()}, ${firstName}`}
-          description="Run an interview, practise with a peer, or look back at past sessions."
+          description="Your interviews, candidates and results in one place."
           actions={
             <>
               <Button variant="outline" asChild>
@@ -127,77 +154,151 @@ export function DashboardPage() {
 
         <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Stat icon={Radio} label="Live now" value={stats.live} accent={stats.live > 0} />
-          <Stat icon={CalendarClock} label="Sessions, last 30 days" value={stats.month} />
+          <Stat icon={CalendarClock} label="Interviews, last 30 days" value={stats.month} />
+          <Stat
+            icon={Gauge}
+            label="Average test score"
+            value={stats.avgScore === null ? '—' : `${stats.avgScore}/100`}
+          />
           <Stat icon={Clock} label="Time interviewing" value={formatDuration(stats.time)} />
-          <Stat icon={Users} label="Practice sessions" value={stats.practice} />
         </div>
 
-        <div className="mt-10 flex flex-wrap items-center gap-3">
-          <h2 className="mr-auto text-lg font-semibold">Sessions</h2>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-            <Input
-              aria-label="Search sessions"
-              placeholder="Search by title"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          <div role="tablist" aria-label="Status" className="flex rounded-lg bg-muted p-0.5">
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                role="tab"
-                aria-selected={filter === f.id}
-                onClick={() => setFilter(f.id)}
-                className={cn(
-                  'h-7 rounded-md px-3 text-[13px] font-medium text-muted-foreground',
-                  filter === f.id && 'bg-background text-foreground shadow-sm',
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {active.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-base font-semibold">Live and upcoming</h2>
+            <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {active.slice(0, 6).map((room) => (
+                <li key={room.id}>
+                  <ActiveRoomCard room={room} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-        <div className="mt-4">
-          {rooms.isPending && (
-            <div className="grid gap-2">
-              {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-[72px] rounded-xl" />
+        <section className="mt-10">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="mr-auto text-base font-semibold">Candidates and sessions</h2>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
+              <Input
+                aria-label="Search sessions"
+                placeholder="Search candidate or title"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <div role="tablist" aria-label="Status" className="flex rounded-lg bg-muted p-0.5">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === f.id}
+                  onClick={() => setFilter(f.id)}
+                  className={cn(
+                    'h-7 rounded-md px-3 text-[13px] font-medium text-muted-foreground',
+                    filter === f.id && 'bg-card text-foreground shadow-sm',
+                  )}
+                >
+                  {f.label}
+                </button>
               ))}
             </div>
-          )}
-          {rooms.error && <ErrorNote>{rooms.error.message}</ErrorNote>}
-          {rooms.data && rooms.data.length === 0 && (
-            <EmptyState
-              icon={Radio}
-              title="No sessions yet"
-              action={
-                <Button variant="glow" onClick={() => setParams({ new: '1' })}>
-                  <Plus /> Create your first room
-                </Button>
-              }
-            >
-              Create a room, send the link, and the candidate joins with just their name.
-            </EmptyState>
-          )}
-          {rooms.data && rooms.data.length > 0 && visible.length === 0 && (
-            <p className="py-10 text-center text-sm text-muted-foreground">No sessions match.</p>
-          )}
-          <ul className="grid gap-2">
-            {visible.map((room) => (
-              <li key={room.id}>
-                <RoomRow room={room} />
-              </li>
-            ))}
-          </ul>
-        </div>
+          </div>
+
+          <div className="mt-4">
+            {rooms.isPending && (
+              <div className="grid gap-2">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} className="h-14 rounded-xl" />
+                ))}
+              </div>
+            )}
+            {rooms.error && <ErrorNote>{rooms.error.message}</ErrorNote>}
+            {rooms.data && rooms.data.length === 0 && (
+              <EmptyState
+                icon={Radio}
+                title="No interviews yet"
+                action={
+                  <Button variant="glow" onClick={() => setParams({ new: '1' })}>
+                    <Plus /> Create your first room
+                  </Button>
+                }
+              >
+                Create a room, send the link, and the candidate joins with just their name.
+              </EmptyState>
+            )}
+            {rooms.data && rooms.data.length > 0 && visible.length === 0 && (
+              <p className="py-10 text-center text-sm text-muted-foreground">No sessions match.</p>
+            )}
+            {visible.length > 0 && (
+              <Card className="overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-muted/50 text-left text-xs text-muted-foreground max-md:hidden">
+                    <tr>
+                      <SortHeader
+                        label="Candidate"
+                        active={sort === 'candidate'}
+                        onClick={() => setSort('candidate')}
+                      />
+                      <th className="px-4 py-2.5 font-medium">Interview</th>
+                      <SortHeader
+                        label="Date"
+                        active={sort === 'date'}
+                        onClick={() => setSort('date')}
+                      />
+                      <th className="px-4 py-2.5 font-medium">Duration</th>
+                      <SortHeader
+                        label="Score"
+                        active={sort === 'score'}
+                        onClick={() => setSort('score')}
+                      />
+                      <th className="px-4 py-2.5 font-medium">Status</th>
+                      <th className="px-4 py-2.5">
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {visible.map((room) => (
+                      <RoomRow key={room.id} room={room} />
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            )}
+          </div>
+        </section>
       </div>
     </AppShell>
+  );
+}
+
+function SortHeader({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <th className="px-4 py-2.5 font-medium" aria-sort={active ? 'descending' : 'none'}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'inline-flex items-center gap-1 hover:text-foreground',
+          active && 'text-foreground',
+        )}
+      >
+        {label}
+        <ArrowDownUp className={cn('size-3', !active && 'opacity-40')} />
+      </button>
+    </th>
   );
 }
 
@@ -213,15 +314,54 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <Card className="relative overflow-hidden p-4">
+    <Card className="p-4">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <Icon className={cn('size-4 text-muted-foreground', accent && 'text-success')} />
+        <span
+          className={cn(
+            'flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground',
+            accent && 'bg-success/10 text-success',
+          )}
+        >
+          <Icon className="size-3.5" />
+        </span>
       </div>
-      <p className="mt-2 font-mono text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-      {accent && (
-        <div className="absolute -right-6 -bottom-6 size-20 rounded-full bg-success/15 blur-xl" />
-      )}
+      <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+    </Card>
+  );
+}
+
+function ActiveRoomCard({ room }: { room: RoomListItem }) {
+  const live = room.status === 'live';
+  const link = `${window.location.origin}/r/${room.slug}`;
+  return (
+    <Card className="flex h-full flex-col p-4">
+      <div className="flex items-center gap-2">
+        {live ? (
+          <Badge tone="success">
+            <LiveDot className="size-1.5" /> Live
+          </Badge>
+        ) : (
+          <Badge>Upcoming</Badge>
+        )}
+        {room.mode === 'practice' && <Badge tone="info">Practice</Badge>}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {live
+            ? `Started ${timeAgo(room.startedAt ?? room.createdAt)}`
+            : `Created ${timeAgo(room.createdAt)}`}
+        </span>
+      </div>
+      <p className="mt-3 truncate font-medium">{room.title}</p>
+      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+        {room.candidateName ? `with ${room.candidateName}` : 'Waiting for the candidate'} ·{' '}
+        {LANGUAGE_INFO[room.defaultLanguage].label}
+      </p>
+      <div className="mt-4 flex gap-2">
+        <Button size="sm" className="flex-1" asChild>
+          <Link to={`/r/${room.slug}`}>{live ? 'Rejoin' : 'Open room'}</Link>
+        </Button>
+        {room.mode !== 'practice' && <CopyLinkButton link={link} />}
+      </div>
     </Card>
   );
 }
@@ -240,122 +380,159 @@ function RoomRow({ room }: { room: RoomListItem }) {
   });
   const link = `${window.location.origin}/r/${room.slug}`;
   const ended = room.status === 'ended';
-  const when = ended
-    ? `Ended ${timeAgo(room.endedAt!)}`
-    : room.status === 'live'
-      ? `Started ${timeAgo(room.startedAt ?? room.createdAt)}`
-      : `Created ${timeAgo(room.createdAt)}`;
+  const duration = durationOf(room);
+  const open = ended ? `/sessions/${room.id}` : `/r/${room.slug}`;
 
   return (
-    <Card className="card-glow group flex flex-wrap items-center gap-4 p-4">
-      <div
-        className={cn(
-          'flex size-10 shrink-0 items-center justify-center rounded-lg border',
-          room.status === 'live' ? 'border-success/30 bg-success/10' : 'bg-background',
-        )}
-      >
-        {room.status === 'live' ? (
-          <LiveDot />
-        ) : room.mode === 'practice' ? (
-          <Users className="size-4 text-muted-foreground" />
-        ) : ended ? (
-          <History className="size-4 text-muted-foreground" />
-        ) : (
-          <CalendarClock className="size-4 text-muted-foreground" />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to={ended ? `/sessions/${room.id}` : `/r/${room.slug}`}
-            className="truncate font-medium hover:underline"
-          >
-            {room.title}
-          </Link>
-          {room.status === 'live' && <Badge tone="success">Live</Badge>}
-          {room.mode === 'practice' && <Badge tone="info">Practice</Badge>}
-          {room.myRole !== 'owner' && room.mode !== 'practice' && <Badge>{room.myRole}</Badge>}
+    <tr className="transition-colors hover:bg-muted/40 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-3 max-md:gap-y-1 max-md:px-4 max-md:py-3">
+      <td className="px-4 py-3 max-md:w-full max-md:p-0">
+        <div className="flex items-center gap-2.5">
+          {room.candidateName ? (
+            <Avatar name={room.candidateName} size={28} />
+          ) : (
+            <span className="flex size-7 items-center justify-center rounded-full border border-dashed text-muted-foreground">
+              <Users className="size-3.5" />
+            </span>
+          )}
+          <span className="min-w-0">
+            <span className="block truncate font-medium">
+              {room.candidateName ?? (
+                <span className="font-normal text-muted-foreground">No candidate yet</span>
+              )}
+            </span>
+            {room.mode === 'practice' && (
+              <span className="text-xs text-muted-foreground">Practice partner</span>
+            )}
+          </span>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {LANGUAGE_INFO[room.defaultLanguage].label} · {when}
-          {ended && durationOf(room) > 0 && ` · ${formatDuration(durationOf(room))}`}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        {ended ? (
-          <>
+      </td>
+      <td className="max-w-[16rem] px-4 py-3 max-md:max-w-none max-md:p-0">
+        <Link to={open} className="block truncate hover:underline">
+          {room.title}
+        </Link>
+        <span className="text-xs text-muted-foreground">
+          {LANGUAGE_INFO[room.defaultLanguage].label}
+          {room.myRole !== 'owner' && room.mode !== 'practice' && ` · ${room.myRole}`}
+        </span>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground max-md:p-0 max-md:text-xs">
+        {new Date(dateOf(room)).toLocaleDateString(undefined, {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums max-md:p-0 max-md:text-xs">
+        {duration > 0 ? formatDuration(duration) : '—'}
+      </td>
+      <td className="px-4 py-3 max-md:p-0">
+        {room.score !== null ? (
+          <span className="flex items-center gap-2">
+            <ScoreBar score={room.score} />
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {room.testsPassed}/{room.testsTotal}
+            </span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3 max-md:p-0">
+        {room.status === 'live' ? (
+          <Badge tone="success">Live</Badge>
+        ) : ended ? (
+          <Badge>Completed</Badge>
+        ) : (
+          <Badge tone="info">Upcoming</Badge>
+        )}
+      </td>
+      <td className="px-4 py-3 text-right max-md:ml-auto max-md:p-0">
+        <div className="flex items-center justify-end gap-1.5">
+          {ended ? (
             <Button size="sm" variant="outline" asChild>
-              <Link to={`/rooms/${room.id}/replay`}>Replay</Link>
-            </Button>
-            <Button size="sm" asChild>
               <Link to={`/sessions/${room.id}`}>Summary</Link>
             </Button>
-          </>
-        ) : (
-          <>
-            {room.mode !== 'practice' && <CopyLinkButton link={link} />}
-            <Button size="sm" asChild>
+          ) : (
+            <Button size="sm" variant="outline" asChild>
               <Link to={`/r/${room.slug}`}>{room.status === 'live' ? 'Rejoin' : 'Open'}</Link>
             </Button>
-          </>
-        )}
-        <Menu>
-          <MenuTrigger asChild>
-            <Button size="icon-sm" variant="ghost" aria-label={`More for ${room.title}`}>
-              <MoreHorizontal />
-            </Button>
-          </MenuTrigger>
-          <MenuContent>
-            {ended && (
-              <MenuItem onSelect={() => navigate(`/sessions/${room.id}`)}>
-                <FileText /> Session summary
-              </MenuItem>
-            )}
-            {!ended && room.mode !== 'practice' && (
-              <MenuItem
-                onSelect={async () => {
-                  await navigator.clipboard.writeText(link);
-                  toast.success('Room link copied');
-                }}
-              >
-                <Copy /> Copy candidate link
-              </MenuItem>
-            )}
-            {room.myRole === 'owner' && (
-              <>
-                <MenuSeparator />
+          )}
+          <Menu>
+            <MenuTrigger asChild>
+              <Button size="icon-sm" variant="ghost" aria-label={`More for ${room.title}`}>
+                <MoreHorizontal />
+              </Button>
+            </MenuTrigger>
+            <MenuContent align="end">
+              {ended && (
+                <>
+                  <MenuItem onSelect={() => navigate(`/sessions/${room.id}`)}>
+                    <FileText /> Session summary
+                  </MenuItem>
+                  <MenuItem onSelect={() => navigate(`/rooms/${room.id}/replay`)}>
+                    <History /> Watch replay
+                  </MenuItem>
+                </>
+              )}
+              {!ended && room.mode !== 'practice' && (
                 <MenuItem
-                  destructive
-                  disabled={room.status === 'live'}
-                  onSelect={() => setConfirm(true)}
+                  onSelect={async () => {
+                    await navigator.clipboard.writeText(link);
+                    toast.success('Room link copied');
+                  }}
                 >
-                  <Trash2 /> Delete session
+                  <Copy /> Copy candidate link
                 </MenuItem>
-              </>
-            )}
-          </MenuContent>
-        </Menu>
-      </div>
-      <Dialog open={confirm} onOpenChange={setConfirm}>
-        <DialogContent
-          title="Delete this session?"
-          description={`“${room.title}” and its replay, notes, code runs and rubric will be deleted for everyone. This can’t be undone.`}
-        >
-          <div className="mt-6 flex justify-end gap-2">
-            <DialogClose asChild>
-              <Button variant="ghost">Cancel</Button>
-            </DialogClose>
-            <Button
-              variant="destructive"
-              disabled={remove.isPending}
-              onClick={() => remove.mutate(undefined, { onSettled: () => setConfirm(false) })}
-            >
-              {remove.isPending && <Spinner />} Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </Card>
+              )}
+              {room.myRole === 'owner' && (
+                <>
+                  <MenuSeparator />
+                  <MenuItem
+                    destructive
+                    disabled={room.status === 'live'}
+                    onSelect={() => setConfirm(true)}
+                  >
+                    <Trash2 /> Delete session
+                  </MenuItem>
+                </>
+              )}
+            </MenuContent>
+          </Menu>
+        </div>
+        <Dialog open={confirm} onOpenChange={setConfirm}>
+          <DialogContent
+            title="Delete this session?"
+            description={`“${room.title}” and its replay, notes, code runs and rubric will be deleted for everyone. This can’t be undone.`}
+          >
+            <div className="mt-6 flex justify-end gap-2">
+              <DialogClose asChild>
+                <Button variant="ghost">Cancel</Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(undefined, { onSettled: () => setConfirm(false) })}
+              >
+                {remove.isPending && <Spinner />} Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </td>
+    </tr>
+  );
+}
+
+/** A score out of 100 as a number with a small bar. */
+export function ScoreBar({ score }: { score: number }) {
+  const tone = score >= 80 ? 'bg-success' : score >= 50 ? 'bg-warning' : 'bg-destructive';
+  return (
+    <span className="flex items-center gap-2" title={`Test score ${score} out of 100`}>
+      <span className="w-8 text-right font-medium tabular-nums">{score}</span>
+      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-muted">
+        <span className={cn('block h-full rounded-full', tone)} style={{ width: `${score}%` }} />
+      </span>
+    </span>
   );
 }
 

@@ -2,6 +2,7 @@ import {
   LANGUAGES,
   LANGUAGE_INFO,
   LIMITS,
+  hasPreview,
   isRunnable,
   type Lang,
   type Participant,
@@ -38,6 +39,7 @@ import { ProblemPanel } from '@/room/problem-panel';
 import type { RoomConnection } from '@/room/use-room';
 import { CodeRunner, type RunPhase } from '@/runner/runner';
 import { monaco, monacoTheme } from './monaco';
+import { PreviewPane } from './preview-pane';
 import { remoteCursorCss } from './remote-cursors';
 import { applyTextDiff } from './text-binding';
 
@@ -121,6 +123,9 @@ export default function CodePanel({
     });
   }, [editor, readOnly]);
 
+  const preview = hasPreview(language);
+  const previewText = preview ? getCodeMap(conn.doc).get(language) : undefined;
+
   const cursorCss = useMemo(
     () => remoteCursorCss(conn.peers, conn.doc.clientID),
     [conn.peers, conn.doc.clientID],
@@ -153,7 +158,7 @@ export default function CodePanel({
           {LANGUAGES.map((l) => (
             <option key={l} value={l}>
               {LANGUAGE_INFO[l].label}
-              {LANGUAGE_INFO[l].runnable ? '' : ' (edit only)'}
+              {LANGUAGE_INFO[l].runnable ? '' : hasPreview(l) ? ' (live preview)' : ' (edit only)'}
             </option>
           ))}
         </NativeSelect>
@@ -180,13 +185,18 @@ export default function CodePanel({
           )
         )}
         <span className="flex-1" />
-        <RunTestsButton conn={conn} language={language} />
-        <RunControls conn={conn} participant={participant} language={language} />
+        {!preview && <RunTestsButton conn={conn} language={language} />}
+        {!preview && <RunControls conn={conn} participant={participant} language={language} />}
       </div>
-      <div className="relative min-h-0 flex-1">
-        <div ref={hostRef} className="absolute inset-0" aria-label="Code editor" />
+      <div className={cn('min-h-0 flex-1', preview && 'grid grid-cols-2 max-md:grid-cols-1')}>
+        <div className="relative h-full min-h-0">
+          <div ref={hostRef} className="absolute inset-0" aria-label="Code editor" />
+        </div>
+        {preview && previewText && (
+          <PreviewPane key={language} text={previewText} className="border-l max-md:border-t" />
+        )}
       </div>
-      <OutputDrawer conn={conn} readOnly={readOnly} />
+      {!preview && <OutputDrawer conn={conn} readOnly={readOnly} />}
     </div>
   );
 }
@@ -421,9 +431,12 @@ function TestResults({
   return (
     <div className="p-3 text-sm">
       {error && <p className="mb-2 text-destructive">{error}</p>}
-      <p className={cn('font-medium', allPassed ? 'text-success' : 'text-destructive')}>
-        {run.passed} / {run.total} tests passed
-        <span className="ml-2 font-normal text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <ScoreBadge score={run.score} />
+        <span className={cn('font-medium', allPassed ? 'text-success' : 'text-destructive')}>
+          {run.passed} / {run.total} tests passed
+        </span>
+        <span className="text-muted-foreground">
           {LANGUAGE_INFO[run.language].label} · requested by {run.requestedBy}
         </span>
       </p>
@@ -462,6 +475,27 @@ function TestResults({
         ))}
       </ul>
     </div>
+  );
+}
+
+export function ScoreBadge({ score, className }: { score: number; className?: string }) {
+  const tone =
+    score >= 80
+      ? 'border-success/30 bg-success/10 text-success'
+      : score >= 50
+        ? 'border-warning/30 bg-warning/10 text-warning'
+        : 'border-destructive/30 bg-destructive/10 text-destructive';
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums',
+        tone,
+        className,
+      )}
+      title="Weighted test score out of 100"
+    >
+      {score}/100
+    </span>
   );
 }
 

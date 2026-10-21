@@ -6,6 +6,7 @@ import {
   type PresenceState,
   type Room,
   type RoomEvent,
+  type RtcSignal,
   type ServerMessage,
   type SharedRun,
   type TestRun,
@@ -48,7 +49,11 @@ export interface RoomConnection {
   requestTests: (questionId: string, language: TestRun['language']) => void;
   /** Interviewers: called when the room asks this browser to run tests. */
   onTestsRequested: (handler: TestsRequestedHandler | null) => void;
+  /** Video call: called with signals other call participants send to this tab. */
+  onRtcSignal: (handler: RtcSignalHandler | null) => void;
 }
+
+export type RtcSignalHandler = (from: string, signal: RtcSignal) => void;
 
 export type TestsRequest = Extract<ServerMessage, { kind: 'tests_requested' }>;
 export type TestsRequestedHandler = (request: TestsRequest) => void;
@@ -91,6 +96,7 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
   const [pendingTestRequest, setPendingTestRequest] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const testsHandler = useRef<TestsRequestedHandler | null>(null);
+  const rtcHandler = useRef<RtcSignalHandler | null>(null);
   const online = useOnline();
 
   useEffect(() => {
@@ -121,7 +127,7 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
       queueMicrotask(readAwareness);
     };
     // Whiteboard pointers and editor carets change awareness constantly; only re-render the
-    // room when who is here, or which tab they're on, changes.
+    // room when who is here, which tab they're on, or their call state changes.
     let peersKey = '';
     const readAwareness = () => {
       awarenessQueued = false;
@@ -131,7 +137,9 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
           list.push({ clientId, state: state as PresenceState });
         }
       });
-      const key = JSON.stringify(list.map((p) => [p.clientId, p.state.user, p.state.tab]));
+      const key = JSON.stringify(
+        list.map((p) => [p.clientId, p.state.user, p.state.tab, p.state.call ?? null]),
+      );
       if (key === peersKey) return;
       peersKey = key;
       setPeers(list);
@@ -174,6 +182,9 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
         case 'tests_failed':
           setPendingTestRequest((cur) => (cur === m.requestId ? null : cur));
           setTestError(m.message);
+          break;
+        case 'rtc':
+          rtcHandler.current?.(m.from, m.signal);
           break;
         case 'error':
           setServerError(m.message);
@@ -270,6 +281,9 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
     },
     onTestsRequested: (handler) => {
       testsHandler.current = handler;
+    },
+    onRtcSignal: (handler) => {
+      rtcHandler.current = handler;
     },
   };
 }

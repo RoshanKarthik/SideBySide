@@ -120,11 +120,21 @@ export const testRunSchema = z.object({
   language: langSchema,
   passed: z.number().int(),
   total: z.number().int(),
+  /** 0–100, weighted by each test's weight. */
+  score: z.number().int().min(0).max(100),
   results: z.array(testResultSchema),
   requestedBy: z.string(),
   serverTs: z.number(),
 });
 export type TestRun = z.infer<typeof testRunSchema>;
+
+/** A test run's score out of 100: the share of test weight that passed, rounded down. */
+export function weightedScore(tests: { passed: boolean; weight: number }[]): number {
+  const total = tests.reduce((sum, t) => sum + Math.max(1, t.weight), 0);
+  if (!total) return 0;
+  const passed = tests.reduce((sum, t) => sum + (t.passed ? Math.max(1, t.weight) : 0), 0);
+  return Math.floor((passed / total) * 100);
+}
 
 /**
  * Output comparison: trailing whitespace on each line and trailing blank lines are ignored;

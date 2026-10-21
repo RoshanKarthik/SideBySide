@@ -1,5 +1,5 @@
-import type { RoomRow } from '@sidebyside/db';
-import type { Room } from '@sidebyside/shared';
+import { eq, users, type Database, type RoomRow } from '@sidebyside/db';
+import { brandOrNull, type Brand, type Room } from '@sidebyside/shared';
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
@@ -23,4 +23,27 @@ export function toRoomDto(row: RoomRow): Room {
 
 export function roomLink(publicAppUrl: string, slug: string): string {
   return `${publicAppUrl.replace(/\/$/, '')}/r/${slug}`;
+}
+
+interface BrandColumns {
+  companyName: string | null;
+  brandLogo: string | null;
+  brandColor: string | null;
+}
+
+export function toBrand(row: BrandColumns): Brand {
+  return { companyName: row.companyName, logo: row.brandLogo, color: row.brandColor };
+}
+
+/** The room owner's company branding, or null when they haven't set any. */
+export async function roomBrand(db: Database, ownerId: string): Promise<Brand | null> {
+  const [owner] = await db
+    .select({
+      companyName: users.companyName,
+      brandLogo: users.brandLogo,
+      brandColor: users.brandColor,
+    })
+    .from(users)
+    .where(eq(users.id, ownerId));
+  return owner ? brandOrNull(toBrand(owner)) : null;
 }

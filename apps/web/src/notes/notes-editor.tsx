@@ -70,9 +70,13 @@ export function NotesEditor({ doc, provider, user, editable, onPaste }: Props) {
   return (
     <div className="flex h-full flex-col">
       {editable && editor && <Toolbar editor={editor} />}
-      <div className="notes-editor min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto h-full max-w-3xl">
-          <EditorContent editor={editor} className="h-full" />
+      {/* A page on a desk, like a shared document. */}
+      <div className="notes-editor min-h-0 flex-1 overflow-y-auto bg-muted/40 px-3 py-4 sm:px-6 sm:py-6">
+        <div className="mx-auto flex min-h-full max-w-3xl flex-col rounded-xl border bg-card shadow-card">
+          <p className="border-b px-6 py-2.5 text-xs font-medium text-muted-foreground">
+            Shared notes · everyone in the room can edit
+          </p>
+          <EditorContent editor={editor} className="flex-1 [&>.ProseMirror]:min-h-[55vh]" />
         </div>
       </div>
     </div>
@@ -145,7 +149,7 @@ function Toolbar({ editor }: { editor: Editor }) {
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="flex flex-wrap gap-0.5 border-b px-3 py-1.5"
+      className="flex flex-wrap gap-0.5 border-b bg-card px-3 py-1.5"
     >
       {items.map(({ label, icon: Icon, active, run }) => (
         <button

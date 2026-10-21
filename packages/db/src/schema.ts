@@ -54,6 +54,11 @@ export const users = pgTable('users', {
   image: text('avatar_url'),
   defaultLanguage: languageEnum('default_language').notNull().default('python'),
   lowBandwidth: boolean('low_bandwidth').notNull().default(false),
+  /** Company branding shown to candidates on this interviewer's join pages and rooms. */
+  companyName: text('company_name'),
+  /** A small image as a data: URL (resized in the browser). */
+  brandLogo: text('brand_logo'),
+  brandColor: text('brand_color'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -237,6 +242,8 @@ export const codeRuns = pgTable(
     memoryKb: integer('memory_kb'),
     testsPassed: integer('tests_passed'),
     testsTotal: integer('tests_total'),
+    /** Weighted test score, 0–100. */
+    score: integer('score'),
     details: jsonb('details'),
     serverTs: timestamp('server_ts', { withTimezone: true, precision: 3 }).notNull(),
   },

@@ -5,39 +5,44 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Design tokens. Dark is the default theme (a code tool people look at for an hour);
- * light is a full alternative. Colours are OKLCH so both themes share hue and chroma.
+ * Design tokens. Light is the default (a professional, Teams-like look); dark is an option
+ * people can switch to. Colours are OKLCH so both themes share hue and chroma.
  */
 :root {
-  --background: oklch(0.985 0.002 270);
-  --foreground: oklch(0.2 0.015 270);
+  --background: oklch(0.982 0.003 255);
+  /* The page's own background, kept when a section (the cinematic hero) restyles --background. */
+  --page-background: oklch(0.982 0.003 255);
+  --foreground: oklch(0.22 0.02 260);
   --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
   --popover: oklch(1 0 0);
-  --muted: oklch(0.965 0.004 270);
-  --muted-foreground: oklch(0.5 0.015 270);
-  --border: oklch(0.915 0.006 270);
-  --input: oklch(0.88 0.008 270);
-  --primary: oklch(0.55 0.22 285);
+  --muted: oklch(0.963 0.005 255);
+  --muted-foreground: oklch(0.5 0.02 258);
+  --border: oklch(0.912 0.008 255);
+  --input: oklch(0.87 0.01 255);
+  --primary: oklch(0.52 0.19 264);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.955 0.006 270);
-  --secondary-foreground: oklch(0.25 0.02 270);
-  --accent: oklch(0.95 0.025 285);
-  --accent-foreground: oklch(0.38 0.16 285);
-  --destructive: oklch(0.56 0.22 25);
+  --secondary: oklch(0.955 0.007 255);
+  --secondary-foreground: oklch(0.26 0.025 260);
+  --accent: oklch(0.95 0.025 264);
+  --accent-foreground: oklch(0.4 0.16 264);
+  --destructive: oklch(0.55 0.21 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.56 0.15 155);
-  --warning: oklch(0.68 0.15 70);
-  --ring: oklch(0.55 0.22 285);
-  --brand-1: oklch(0.6 0.22 285);
-  --brand-2: oklch(0.66 0.15 220);
-  --glow: oklch(0.6 0.22 285 / 0.18);
-  --radius: 0.65rem;
+  --success: oklch(0.55 0.14 155);
+  --warning: oklch(0.66 0.15 65);
+  --ring: oklch(0.52 0.19 264);
+  --brand-1: oklch(0.52 0.19 264);
+  --brand-2: oklch(0.62 0.14 230);
+  --glow: oklch(0.52 0.19 264 / 0.14);
+  --elev-1: 0 1px 2px oklch(0.2 0.02 260 / 0.05), 0 1px 3px oklch(0.2 0.02 260 / 0.04);
+  --elev-2: 0 8px 24px -8px oklch(0.2 0.03 260 / 0.14), 0 2px 6px oklch(0.2 0.02 260 / 0.05);
+  --radius: 0.6rem;
   color-scheme: light;
 }
 
 .dark {
   --background: oklch(0.135 0.006 275);
+  --page-background: oklch(0.135 0.006 275);
   --foreground: oklch(0.96 0.004 270);
   --card: oklch(0.17 0.007 275);
   --card-foreground: var(--foreground);
@@ -46,20 +51,22 @@
   --muted-foreground: oklch(0.7 0.012 270);
   --border: oklch(1 0 0 / 0.085);
   --input: oklch(1 0 0 / 0.13);
-  --primary: oklch(0.72 0.16 285);
-  --primary-foreground: oklch(0.16 0.03 285);
+  --primary: oklch(0.72 0.15 268);
+  --primary-foreground: oklch(0.16 0.03 268);
   --secondary: oklch(0.22 0.008 275);
   --secondary-foreground: oklch(0.94 0.004 270);
-  --accent: oklch(0.27 0.045 285);
-  --accent-foreground: oklch(0.9 0.06 285);
+  --accent: oklch(0.27 0.045 268);
+  --accent-foreground: oklch(0.9 0.06 268);
   --destructive: oklch(0.66 0.21 22);
   --destructive-foreground: oklch(0.14 0 0);
   --success: oklch(0.75 0.16 155);
   --warning: oklch(0.83 0.15 80);
-  --ring: oklch(0.72 0.16 285);
-  --brand-1: oklch(0.72 0.18 285);
+  --ring: oklch(0.72 0.15 268);
+  --brand-1: oklch(0.72 0.16 268);
   --brand-2: oklch(0.8 0.13 205);
-  --glow: oklch(0.72 0.18 285 / 0.22);
+  --glow: oklch(0.72 0.16 268 / 0.22);
+  --elev-1: 0 1px 2px oklch(0 0 0 / 0.3);
+  --elev-2: 0 12px 32px -10px oklch(0 0 0 / 0.55);
   color-scheme: dark;
 }
 
@@ -91,6 +98,8 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 10px);
+  --shadow-card: var(--elev-1);
+  --shadow-raised: var(--elev-2);
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, 'Cascadia Code', 'Consolas', monospace;
   --animate-fade-up: fade-up 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -147,7 +156,7 @@
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
-    font-size: 15px;
+    font-size: 14.5px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -220,6 +229,12 @@
     );
     background-size: 200% 100%;
     animation: var(--animate-shimmer);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
   }
 }
 
@@ -408,9 +423,31 @@
   padding: 0.25rem 0.5rem;
 }
 
-/* Route changes cross-fade where the browser supports view transitions. */
-::view-transition-old(root),
+/*
+ * Page changes (and the theme switch, and lobby to room) cross-fade where the browser supports
+ * view transitions: the old page fades out while the new one fades in and settles into place.
+ */
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+::view-transition-old(root) {
+  animation: 0.22s cubic-bezier(0.4, 0, 1, 1) both page-out;
+}
 ::view-transition-new(root) {
-  animation-duration: 0.35s;
-  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  animation: 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) 0.06s both page-in;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

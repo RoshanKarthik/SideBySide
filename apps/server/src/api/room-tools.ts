@@ -22,7 +22,7 @@ import { canInviteInterviewers, canManageInterview } from '../auth/permissions';
 import type { AppDeps, AppEnv } from '../context';
 import { badRequest, conflict, forbidden, notFound, unauthorized } from '../lib/errors';
 import { findQuestion, loadTests, toQuestion } from '../lib/questions';
-import { roomLink, toRoomDto } from '../lib/serialize';
+import { roomBrand, roomLink, toRoomDto } from '../lib/serialize';
 import { randomSlug } from '../lib/slug';
 import { parseBody } from '../lib/validate';
 
@@ -196,6 +196,7 @@ export function roomToolRoutes(deps: AppDeps) {
         role: participant!.role,
       },
       collabToken: null,
+      brand: await roomBrand(c.var.db, room.ownerId),
     };
     return c.json(body);
   });

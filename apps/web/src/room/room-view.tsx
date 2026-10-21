@@ -13,8 +13,12 @@ import {
   X,
 } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { Link } from 'react-router';
-import { LogoMark, ThemeToggle } from '@/components/layout';
+import { Link } from '@/lib/navigation';
+import { CallControls, CallDock } from '@/call/call-ui';
+import type { LocalMedia } from '@/call/local-media';
+import { useCall } from '@/call/use-call';
+import { BrandMark, brandStyle } from '@/components/brand';
+import { ThemeToggle } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Badge, ErrorNote, Spinner } from '@/components/ui/card';
 import {
@@ -49,9 +53,25 @@ const TABS: { id: Tab; label: string; icon: typeof Code2 }[] = [
   { id: 'design', label: 'Design', icon: PenTool },
 ];
 
-export function RoomView({ slug, membership }: { slug: string; membership: JoinRoomResponse }) {
-  const { room, participant } = membership;
+export function RoomView({
+  slug,
+  membership,
+  media,
+  startInCall = false,
+}: {
+  slug: string;
+  membership: JoinRoomResponse;
+  media: LocalMedia;
+  startInCall?: boolean;
+}) {
+  const { room, participant, brand } = membership;
   const conn = useRoom(room, participant, slug);
+  const call = useCall(conn, media);
+  const [autoJoined, setAutoJoined] = useState(false);
+  if (startInCall && !autoJoined && conn) {
+    setAutoJoined(true);
+    call.join();
+  }
   const [tab, setTab] = useState<Tab>('discuss');
   const [codeOpened, setCodeOpened] = useState(false);
   const [designOpened, setDesignOpened] = useState(false);
@@ -89,6 +109,13 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
     }
   }, [conn]);
 
+  // Leaving the room (or the session ending) turns the camera and microphone off.
+  const ended = !!conn && (conn.ended || end.isSuccess);
+  const releaseMedia = media.release;
+  useEffect(() => {
+    if (ended) releaseMedia();
+  }, [ended, releaseMedia]);
+
   if (!conn) return null;
   if (conn.ended || end.isSuccess) {
     return (
@@ -122,14 +149,14 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-card/30 px-3 py-2">
+    <div className="flex h-full flex-col bg-background" style={brandStyle(brand)}>
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-card px-3 py-2">
         <Link
           to={interviewer ? '/dashboard' : '#'}
-          aria-label={interviewer ? 'Back to dashboard' : 'SideBySide'}
+          aria-label={interviewer ? 'Back to dashboard' : (brand?.companyName ?? 'SideBySide')}
           className="shrink-0"
         >
-          <LogoMark />
+          <BrandMark brand={brand} compact />
         </Link>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <h1 className="truncate font-semibold">{room.title}</h1>
@@ -143,6 +170,8 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
         <SessionTimer startedAt={startedAt} />
         <ConnectionIndicator status={conn.status} />
         <PresenceAvatars peers={conn.peers} selfClientId={conn.doc.clientID} />
+        <span className="hidden h-6 w-px bg-border sm:block" aria-hidden />
+        <CallControls call={call} media={media} />
         {interviewer && !practice && <CopyCandidateLink slug={slug} />}
         {interviewer && <EndSessionButton pending={end.isPending} onConfirm={() => end.mutate()} />}
         {interviewer && (
@@ -162,7 +191,7 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
       <nav
         role="tablist"
         aria-label="Room"
-        className="flex items-center gap-1 border-b px-3 py-1.5"
+        className="flex items-center gap-1 border-b bg-card px-3"
       >
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
@@ -172,8 +201,9 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
             aria-selected={tab === id}
             onClick={() => switchTab(id)}
             className={cn(
-              'flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
-              tab === id && 'bg-muted text-foreground shadow-[inset_0_0_0_1px_var(--border)]',
+              'relative flex h-10 items-center gap-1.5 px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
+              tab === id &&
+                'text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary',
             )}
           >
             <Icon className={cn('size-4', tab === id && 'text-primary')} />
@@ -268,6 +298,11 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
               </Suspense>
             </section>
           )}
+          <CallDock
+            call={call}
+            media={media}
+            self={{ name: participant.displayName, id: participant.id }}
+          />
           {!interviewer && <ActivityStrip signals={signals} sessionStart={startedAt} />}
         </main>
         {interviewer && (

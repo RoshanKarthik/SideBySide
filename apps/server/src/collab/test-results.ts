@@ -1,5 +1,6 @@
 import {
   outputsMatch,
+  weightedScore,
   type Lang,
   type TestOutcome,
   type TestResult,
@@ -11,6 +12,7 @@ export interface StoredTest {
   stdin: string;
   expectedStdout: string;
   isHidden: boolean;
+  weight: number;
 }
 
 export interface TestRunContext {
@@ -26,7 +28,7 @@ export interface TestRunContext {
  * Combines the tests stored on the server with the outcomes a browser reported. Pass/fail is
  * decided here from the stored expected output, not taken from the browser. Returns the full
  * results (for interviewers) and the candidate view, where hidden tests carry no inputs,
- * expected output, actual output or error text.
+ * expected output, actual output or error text. The score weights each test by its weight.
  */
 export function buildTestRuns(
   tests: StoredTest[],
@@ -58,6 +60,9 @@ export function buildTestRuns(
     r.hidden ? { index: r.index, status: r.status, timeMs: r.timeMs, hidden: true } : r,
   );
   const passed = full.filter((r) => r.status === 'passed').length;
-  const base = { ...ctx, passed, total: full.length };
+  const score = weightedScore(
+    full.map((r, i) => ({ passed: r.status === 'passed', weight: tests[i]!.weight })),
+  );
+  const base = { ...ctx, passed, total: full.length, score };
   return { full: { ...base, results: full }, candidate: { ...base, results: candidate } };
 }

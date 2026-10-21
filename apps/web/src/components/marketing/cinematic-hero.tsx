@@ -1,8 +1,9 @@
 import '@fontsource/instrument-serif/400.css';
 import './cinematic.css';
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { useCallback, useState } from 'react';
+import { ThemeToggle } from '@/components/layout';
 import { useSession } from '@/lib/auth-client';
+import { Link } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 
 const VIDEO_SRC =
@@ -60,26 +61,24 @@ const NAV = [
   { label: 'Home', href: '/', active: true },
   { label: 'Features', href: '/#features' },
   { label: 'How it works', href: '/#how-it-works' },
-  { label: 'Practice', href: '/practice' },
-  { label: 'Privacy', href: '/privacy' },
+  { label: 'Practice', href: '/#practice' },
+  { label: 'Privacy', href: '/#trust' },
 ];
 
-export function CinematicHero() {
+/** The landing page's opening: video, glass navigation and the headline. */
+export function CinematicHero({ id }: { id?: string }) {
   const { data: session } = useSession();
   const start = session ? '/dashboard?new=1' : '/login?mode=signup';
 
-  // Fetch the sign-in page's code while the visitor reads, so the click feels instant.
-  useEffect(() => {
-    const id = setTimeout(() => void import('@/routes/login'), 1500);
-    return () => clearTimeout(id);
-  }, []);
-
   return (
-    <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
+    <section
+      id={id}
+      className="cinematic relative isolate flex min-h-[100svh] flex-col overflow-hidden"
+    >
       <BackgroundVideo />
       <div
         aria-hidden
-        className="hero-fade pointer-events-none absolute inset-x-0 bottom-0 z-0 h-48"
+        className="hero-fade pointer-events-none absolute inset-x-0 bottom-0 z-0 h-56"
       />
 
       <nav
@@ -109,11 +108,11 @@ export function CinematicHero() {
             </li>
           ))}
         </ul>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
+          <ThemeToggle className="text-muted-foreground hover:bg-white/10 hover:text-foreground" />
           {!session && (
             <Link
               to="/login"
-              viewTransition
               className="hidden text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline"
             >
               Sign in
@@ -121,34 +120,31 @@ export function CinematicHero() {
           )}
           <Link
             to={session ? '/dashboard' : start}
-            viewTransition
-            className="liquid-glass rounded-full px-6 py-2.5 text-sm text-foreground transition-transform duration-300 hover:scale-[1.03]"
+            className="liquid-glass rounded-full px-6 py-2.5 text-sm text-foreground hover:scale-[1.03]"
           >
-            {session ? 'Open app' : 'Get started'}
+            {session ? 'Open dashboard' : 'Get started'}
           </Link>
         </div>
       </nav>
 
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-[90px] text-center">
-        <h1 className="animate-fade-rise font-display max-w-7xl text-5xl leading-[0.95] tracking-[-2.46px] sm:text-7xl md:text-8xl">
+        <h1 className="animate-fade-rise font-display max-w-7xl text-5xl leading-[0.95] font-normal tracking-[-2.46px] sm:text-7xl md:text-8xl">
           Where <em className="text-muted-foreground not-italic">talent</em> shows up{' '}
           <em className="text-muted-foreground not-italic">side by side.</em>
         </h1>
         <p className="animate-fade-rise-delay mt-8 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          One link opens a live room with shared notes, a code editor that actually runs code,
-          hidden tests and a whiteboard. No screen sharing, no installs, and every keystroke can be
-          replayed afterwards.
+          One link opens a live interview room: a video call, a code editor that actually runs code,
+          hidden tests and a whiteboard. No installs, and every keystroke can be replayed
+          afterwards.
         </p>
         <Link
           to={start}
-          viewTransition
-          className="animate-fade-rise-delay-2 liquid-glass mt-12 cursor-pointer rounded-full px-14 py-5 text-base text-foreground transition-transform duration-300 hover:scale-[1.03]"
+          className="animate-fade-rise-delay-2 liquid-glass mt-12 cursor-pointer rounded-full px-14 py-5 text-base text-foreground hover:scale-[1.03]"
         >
           Start an interview
         </Link>
         <Link
           to={session ? '/practice' : '/login?next=/practice'}
-          viewTransition
           className="animate-fade-rise-delay-2 mt-6 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           or practise with a peer →

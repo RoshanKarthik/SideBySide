@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b0b10" />
+    <meta name="theme-color" content="#f7f8fa" />
     <meta
       name="description"
-      content="Live technical interviews: shared notes, a real code editor and replays, from one link."
+      content="Technical interviews in one link: video call, shared code editor with hidden tests, whiteboard, private scorecard and full replay."
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>SideBySide</title>
     <script>
-      // Dark unless the visitor chose light; applied before first paint to avoid a flash.
-      let dark = true;
+      // Light unless the visitor chose dark; applied before first paint to avoid a flash.
+      let dark = false;
       try {
-        dark = localStorage.getItem('sbs-theme') !== 'light';
+        dark = localStorage.getItem('sbs-theme') === 'dark';
       } catch {}
       if (dark) document.documentElement.classList.add('dark');
     </script>

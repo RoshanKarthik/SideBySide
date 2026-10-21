@@ -1,39 +1,17 @@
-import '@fontsource/instrument-serif/400.css';
-import '@/components/marketing/cinematic.css';
-import { ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router';
+import { MarketingShell } from '@/components/layout';
 
-/** Privacy and Terms, in the same cinematic style as the landing page they're linked from. */
+/** Privacy and Terms. */
 function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="cinematic min-h-full">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-8 py-6">
-        <Link
-          to="/"
-          viewTransition
-          className="font-display text-3xl tracking-tight text-foreground"
-          aria-label="SideBySide home"
-        >
-          SideBySide
-        </Link>
-        <Link
-          to="/"
-          viewTransition
-          className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Back home
-        </Link>
-      </nav>
-      <article className="animate-fade-rise mx-auto max-w-2xl space-y-5 px-6 pt-12 pb-24 leading-relaxed text-foreground/85">
-        <h1 className="font-display text-6xl leading-none tracking-[-1.5px] text-foreground">
-          {title}
-        </h1>
-        <p className="liquid-glass rounded-xl px-4 py-3 text-sm text-muted-foreground">
+    <MarketingShell bare>
+      <article className="mx-auto max-w-2xl space-y-5 px-6 pt-14 pb-24 leading-relaxed text-foreground/85">
+        <h1 className="text-4xl font-semibold tracking-tight text-foreground">{title}</h1>
+        <p className="rounded-lg border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
           Placeholder text. Have this page reviewed before a public launch.
         </p>
         {children}
       </article>
-    </div>
+    </MarketingShell>
   );
 }
 
@@ -46,9 +24,10 @@ export function PrivacyPage() {
         is told this before they join, and nothing is recorded without that notice.
       </p>
       <p>
-        We do not record audio, video or your screen, and we do not keep IP addresses. Sessions are
-        deleted automatically after the retention period the interviewer picked (7, 30 or 90 days),
-        and the interviewer can delete a session at any time.
+        Video calls in a room are peer to peer: audio and video go directly between participants and
+        are never recorded or stored by SideBySide. We do not record your screen, and we do not keep
+        IP addresses. Sessions are deleted automatically after the retention period the interviewer
+        picked (7, 30 or 90 days), and the interviewer can delete a session at any time.
       </p>
     </LegalPage>
   );

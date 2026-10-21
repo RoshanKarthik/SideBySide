@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
-export const LANGUAGES = ['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'go'] as const;
+export const LANGUAGES = [
+  'python',
+  'javascript',
+  'typescript',
+  'java',
+  'cpp',
+  'c',
+  'go',
+  'html',
+] as const;
 export const langSchema = z.enum(LANGUAGES);
 export type Lang = z.infer<typeof langSchema>;
 
@@ -10,6 +19,8 @@ export interface LanguageInfo {
   monacoId: string;
   /** Whether the in-browser runner can execute this language. */
   runnable: boolean;
+  /** Rendered live in a sandboxed preview frame instead of being run. */
+  preview?: boolean;
   starter: string;
 }
 
@@ -60,8 +71,41 @@ export const LANGUAGE_INFO: Record<Lang, LanguageInfo> = {
     starter:
       'package main\n\nimport (\n\t"bufio"\n\t"fmt"\n\t"os"\n)\n\nfunc main() {\n\tname, _ := bufio.NewReader(os.Stdin).ReadString(\'\n\')\n\tfmt.Printf("Hello, %s", name)\n}\n',
   },
+  html: {
+    label: 'HTML / CSS / JS',
+    monacoId: 'html',
+    runnable: false,
+    preview: true,
+    starter: `<!doctype html>
+<html>
+  <head>
+    <style>
+      body { font-family: system-ui, sans-serif; padding: 24px; }
+      button { padding: 8px 16px; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Hello!</h1>
+    <button id="btn">Clicked 0 times</button>
+    <script>
+      let count = 0;
+      const btn = document.getElementById('btn');
+      btn.addEventListener('click', () => {
+        count += 1;
+        btn.textContent = 'Clicked ' + count + ' times';
+      });
+    </script>
+  </body>
+</html>
+`,
+  },
 };
 
 export function isRunnable(lang: Lang): boolean {
   return LANGUAGE_INFO[lang].runnable;
+}
+
+/** Front-end code that renders in a live preview instead of running. */
+export function hasPreview(lang: Lang): boolean {
+  return LANGUAGE_INFO[lang].preview === true;
 }

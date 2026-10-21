@@ -23,6 +23,35 @@ export const runRecordSchema = runOutputSchema.extend({
 });
 export type RunRecord = z.infer<typeof runRecordSchema>;
 
+/** Identifies one browser tab in the video call (random, chosen by the client). */
+export const callIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/);
+
+/**
+ * WebRTC signalling, relayed by the room between two call participants. Descriptions and ICE
+ * candidates are passed through as the browser produced them.
+ */
+export const rtcSignalSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('description'),
+    description: z.object({
+      type: z.enum(['offer', 'answer', 'pranswer', 'rollback']),
+      sdp: z.string().max(64_000).optional(),
+    }),
+  }),
+  z.object({
+    type: z.literal('candidate'),
+    candidate: z
+      .object({
+        candidate: z.string().max(2_000),
+        sdpMid: z.string().max(64).nullable().optional(),
+        sdpMLineIndex: z.number().int().min(0).max(64).nullable().optional(),
+        usernameFragment: z.string().max(256).nullable().optional(),
+      })
+      .nullable(),
+  }),
+]);
+export type RtcSignal = z.infer<typeof rtcSignalSchema>;
+
 /** Custom messages a client sends to the room over the collaboration socket. */
 export const clientMessageSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('event'), event: clientEventSchema }),
@@ -42,6 +71,16 @@ export const clientMessageSchema = z.discriminatedUnion('kind', [
     requestId: z.string().min(1).max(64),
     source: z.string().max(LIMITS.sourceBytes),
     outcomes: z.array(testOutcomeSchema).max(50),
+  }),
+  /**
+   * Video call: registers this tab's call id and, with `to`, passes a signal to the tab that
+   * owns that id. Without `to` it only registers (sent when joining the call).
+   */
+  z.object({
+    kind: z.literal('rtc'),
+    from: callIdSchema,
+    to: callIdSchema.optional(),
+    signal: rtcSignalSchema.optional(),
   }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -75,6 +114,8 @@ export const serverMessageSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('tests_result'), run: testRunSchema }),
   z.object({ kind: z.literal('tests_failed'), requestId: z.string(), message: z.string() }),
   z.object({ kind: z.literal('error'), code: z.string(), message: z.string() }),
+  /** Video call signal from another call participant. */
+  z.object({ kind: z.literal('rtc'), from: callIdSchema, signal: rtcSignalSchema }),
 ]);
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
 
@@ -87,8 +128,16 @@ export interface PresenceState {
     role: string;
   };
   tab: 'discuss' | 'code' | 'design';
+  /** Present while this tab is in the video call. */
+  call?: CallPresence | null;
   /** Whiteboard pointer in scene coordinates, while on the Design tab. */
   pointer?: BoardPointer | null;
+}
+
+export interface CallPresence {
+  id: string;
+  mic: boolean;
+  cam: boolean;
 }
 
 export interface BoardPointer {

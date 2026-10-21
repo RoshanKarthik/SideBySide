@@ -12,7 +12,8 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Copy, EyeOff, Plus, Save, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
+import { Link, useNavigate } from '@/lib/navigation';
 import { AppShell } from '@/components/layout';
 import { Markdown } from '@/components/markdown';
 import { Button } from '@/components/ui/button';

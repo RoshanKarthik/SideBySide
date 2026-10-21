@@ -1,8 +1,10 @@
 import { LANGUAGES, LANGUAGE_INFO, type Lang } from '@sidebyside/shared';
 import { useMutation } from '@tanstack/react-query';
-import { Download, Gauge, Moon, Palette, Sun, Trash2, UserRound } from 'lucide-react';
+import { Building2, Download, Gauge, Moon, Palette, Sun, Trash2, UserRound } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Navigate, useNavigate } from 'react-router';
+import { Navigate } from 'react-router';
+import { useNavigate } from '@/lib/navigation';
+import { BrandForm } from '@/components/brand-form';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card, ErrorNote, PageHeader, Skeleton, Spinner } from '@/components/ui/card';
@@ -24,7 +26,10 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-8 sm:py-10">
-        <PageHeader title="Settings" description="Your profile, preferences and data." />
+        <PageHeader
+          title="Settings"
+          description="Your profile, company branding, preferences and data."
+        />
         {me.isPending && <Skeleton className="mt-8 h-64 rounded-xl" />}
         {me.error && <ErrorNote>{me.error.message}</ErrorNote>}
         {me.data && (
@@ -37,6 +42,9 @@ export default function SettingsPage() {
                 email={me.data.email}
                 avatar={me.data.avatarUrl}
               />
+            </Section>
+            <Section icon={Building2} title="Company branding">
+              <BrandForm brand={me.data.brand} />
             </Section>
             <Section icon={Palette} title="Preferences">
               <Preferences
