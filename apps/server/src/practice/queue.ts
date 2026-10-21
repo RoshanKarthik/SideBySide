@@ -27,6 +27,8 @@ export interface QueueSnapshot {
 export class MatchQueue {
   private waiting = new Map<string, QueueEntry>();
   private matched = new Map<string, { roomSlug: string; partnerName: string; at: number }>();
+  /** Claimed by a match whose room is still being created; they still poll as waiting. */
+  private pairing = new Map<string, QueueEntry>();
 
   constructor(
     private readonly createRoom: (
@@ -76,7 +78,7 @@ export class MatchQueue {
     const match = this.matched.get(userId);
     if (match)
       return { status: 'matched', roomSlug: match.roomSlug, partnerName: match.partnerName };
-    const entry = this.waiting.get(userId);
+    const entry = this.waiting.get(userId) ?? this.pairing.get(userId);
     if (!entry) return { status: 'idle' };
     entry.lastSeen = now;
     return {
@@ -90,6 +92,7 @@ export class MatchQueue {
 
   leave(userId: string) {
     this.waiting.delete(userId);
+    this.pairing.delete(userId);
     this.matched.delete(userId);
   }
 
@@ -113,6 +116,8 @@ export class MatchQueue {
     // Claim both before awaiting anything.
     this.waiting.delete(entry.userId);
     this.waiting.delete(partner.userId);
+    this.pairing.set(entry.userId, entry);
+    this.pairing.set(partner.userId, partner);
     // The one who waited longer interviews first; the topic is theirs unless it was "mixed".
     const [first, second] =
       partner.enqueuedAt <= entry.enqueuedAt ? [partner, entry] : [entry, partner];
@@ -122,11 +127,15 @@ export class MatchQueue {
     };
     try {
       const { roomSlug } = await this.createRoom(first, second, prefs);
+      this.pairing.delete(first.userId);
+      this.pairing.delete(second.userId);
       this.matched.set(first.userId, { roomSlug, partnerName: second.name, at: now });
       this.matched.set(second.userId, { roomSlug, partnerName: first.name, at: now });
       return true;
     } catch (err) {
       // Put them back so the next poll or sweep can try again.
+      this.pairing.delete(first.userId);
+      this.pairing.delete(second.userId);
       this.waiting.set(first.userId, first);
       this.waiting.set(second.userId, second);
       console.error('Could not create practice room', err);
