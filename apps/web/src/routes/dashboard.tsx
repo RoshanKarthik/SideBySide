@@ -152,7 +152,7 @@ export function DashboardPage() {
           }
         />
 
-        <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="stagger mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Stat icon={Radio} label="Live now" value={stats.live} accent={stats.live > 0} />
           <Stat icon={CalendarClock} label="Interviews, last 30 days" value={stats.month} />
           <Stat
@@ -166,7 +166,7 @@ export function DashboardPage() {
         {active.length > 0 && (
           <section className="mt-10">
             <h2 className="text-base font-semibold">Live and upcoming</h2>
-            <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="stagger mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {active.slice(0, 6).map((room) => (
                 <li key={room.id}>
                   <ActiveRoomCard room={room} />
@@ -261,7 +261,7 @@ export function DashboardPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="stagger divide-y">
                     {visible.map((room) => (
                       <RoomRow key={room.id} room={room} />
                     ))}

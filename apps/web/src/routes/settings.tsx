@@ -33,7 +33,7 @@ export default function SettingsPage() {
         {me.isPending && <Skeleton className="mt-8 h-64 rounded-xl" />}
         {me.error && <ErrorNote>{me.error.message}</ErrorNote>}
         {me.data && (
-          <div className="mt-8 space-y-6">
+          <div className="stagger mt-8 space-y-6">
             <Section icon={UserRound} title="Profile">
               <ProfileForm
                 key={me.data.displayName}

@@ -187,7 +187,7 @@ export default function LandingPage() {
   const practice = session ? '/practice' : '/login?next=/practice';
 
   return (
-    <MarketingShell revealHeaderAfter="top">
+    <MarketingShell revealHeaderAfter="top" animate={false}>
       <CinematicHero id="top" />
 
       {/* The product, up close */}
@@ -229,7 +229,7 @@ export default function LandingPage() {
             {PARTS.map(({ icon: Icon, title, body, preview }) => (
               <article
                 key={title}
-                className="flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-card"
+                className="reveal-on-scroll flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-card"
               >
                 <div className="border-b bg-muted/40 p-4">{preview}</div>
                 <div className="p-5">
@@ -252,7 +252,10 @@ export default function LandingPage() {
           </SectionHeading>
           <ol className="mt-12 grid gap-4 md:grid-cols-3">
             {FLOW.map(({ icon: Icon, label, title, items }, i) => (
-              <li key={label} className="h-full rounded-xl border bg-card p-6 shadow-card">
+              <li
+                key={label}
+                className="reveal-on-scroll h-full rounded-xl border bg-card p-6 shadow-card"
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Icon className="size-4" />
@@ -289,7 +292,7 @@ export default function LandingPage() {
               { k: '2 rounds', v: 'roles swap halfway' },
               { k: 'Feedback', v: 'private ratings' },
             ].map(({ k, v }) => (
-              <div key={k} className="rounded-xl border bg-card p-5 shadow-card">
+              <div key={k} className="reveal-on-scroll rounded-xl border bg-card p-5 shadow-card">
                 <p className="text-lg font-semibold">{k}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{v}</p>
               </div>
@@ -313,7 +316,10 @@ export default function LandingPage() {
           />
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {TRUST.map(({ icon: Icon, title, body }) => (
-              <div key={title} className="rounded-xl border bg-card p-5 shadow-card">
+              <div
+                key={title}
+                className="reveal-on-scroll rounded-xl border bg-card p-5 shadow-card"
+              >
                 <Icon className="size-5 text-primary" />
                 <h3 className="mt-3 font-semibold">{title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{body}</p>
