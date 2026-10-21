@@ -110,7 +110,7 @@ export default function QuestionEditPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-8">
         <Link
           to="/questions"
           className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

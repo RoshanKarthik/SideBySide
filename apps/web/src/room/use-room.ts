@@ -1,4 +1,5 @@
 import {
+  roomDocumentName,
   serverMessageSchema,
   type ClientMessage,
   type Participant,
@@ -31,6 +32,8 @@ export interface RoomConnection {
   lastRun: SharedRun | null;
   events: RoomEvent[];
   ended: boolean;
+  /** Practice: the peers moved to this round; the room reloads into it. */
+  roundChanged: number | null;
   serverError: string | null;
   send: (message: ClientMessage) => boolean;
   setTab: (tab: PresenceState['tab']) => void;
@@ -81,6 +84,7 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
   const [lastRun, setLastRun] = useState<SharedRun | null>(null);
   const [events, setEvents] = useState<RoomEvent[]>([]);
   const [ended, setEnded] = useState(room.status === 'ended');
+  const [roundChanged, setRoundChanged] = useState<number | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [lastTestRun, setLastTestRun] = useState<TestRun | null>(null);
@@ -90,7 +94,7 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
   const online = useOnline();
 
   useEffect(() => {
-    const docName = `${room.id}--shared`;
+    const docName = roomDocumentName(room.id, 'shared', room.currentRound);
     const doc = new Y.Doc();
     const provider = new YProvider(window.location.host, docName, doc, {
       prefix: `/collab/room/${docName}`,
@@ -153,6 +157,10 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
           setEnded(true);
           provider.disconnect();
           break;
+        case 'round_changed':
+          setRoundChanged(m.round);
+          provider.disconnect();
+          break;
         case 'lock_state':
           setLocked(m.locked);
           break;
@@ -176,6 +184,9 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
     const onClose = (event: CloseEvent) => {
       if (event.code === 4000) {
         setEnded(true);
+        provider.disconnect();
+      } else if (event.code === 4001) {
+        setRoundChanged((r) => r ?? room.currentRound + 1);
         provider.disconnect();
       }
     };
@@ -207,7 +218,7 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
       setLive(null);
       setSynced(false);
     };
-  }, [room.id, slug, participant]);
+  }, [room.id, room.currentRound, slug, participant]);
 
   if (!live) return null;
   const { doc, provider } = live;
@@ -226,6 +237,7 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
     lastRun,
     events,
     ended,
+    roundChanged,
     serverError,
     send: (message) => {
       if (!provider.wsconnected) return false;

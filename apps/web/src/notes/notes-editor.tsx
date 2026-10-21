@@ -4,7 +4,7 @@ import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extensions';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import StarterKit from '@tiptap/starter-kit';
 import {
   Bold,
@@ -28,10 +28,16 @@ interface Props {
   /** Full presence user; the caret extension writes it to the awareness 'user' field. */
   user: PresenceState['user'];
   editable: boolean;
+  /** Called with the plain text of each paste (for the room's activity signals). */
+  onPaste?: (text: string) => void;
 }
 
 /** The Discuss tab: rich-text notes shared by everyone in the room. */
-export function NotesEditor({ doc, provider, user, editable }: Props) {
+export function NotesEditor({ doc, provider, user, editable, onPaste }: Props) {
+  const onPasteRef = useRef(onPaste);
+  useEffect(() => {
+    onPasteRef.current = onPaste;
+  }, [onPaste]);
   const editor = useEditor(
     {
       editable,
@@ -46,7 +52,13 @@ export function NotesEditor({ doc, provider, user, editable }: Props) {
         Collaboration.configure({ document: doc, field: DOC_FIELDS.notes }),
         CollaborationCaret.configure({ provider, user }),
       ],
-      editorProps: { attributes: { 'aria-label': 'Shared notes' } },
+      editorProps: {
+        attributes: { 'aria-label': 'Shared notes' },
+        handlePaste: (_view, event) => {
+          onPasteRef.current?.(event.clipboardData?.getData('text/plain') ?? '');
+          return false; // Let the editor paste as usual.
+        },
+      },
     },
     [doc, provider],
   );

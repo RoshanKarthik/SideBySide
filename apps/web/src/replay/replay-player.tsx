@@ -1,19 +1,43 @@
-import { LANGUAGE_INFO, type ReplayManifest } from '@sidebyside/shared';
+import {
+  LANGUAGE_INFO,
+  type ReplayManifest,
+  type ReplayMarker,
+  type ReplayMarkerKind,
+} from '@sidebyside/shared';
 import { DOC_FIELDS, getCodeMap, getMeta, readActiveLanguage } from '@sidebyside/shared/doc';
 import { ReplayCursor, type ReplayLog } from '@sidebyside/shared/replay';
 import Collaboration from '@tiptap/extension-collaboration';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { ArrowLeft, Code2, NotebookPen, Pause, PenTool, Play } from 'lucide-react';
+import {
+  AppWindow,
+  ArrowLeft,
+  BookOpen,
+  ClipboardPaste,
+  Code2,
+  EyeOff,
+  FlaskConical,
+  Lightbulb,
+  ListOrdered,
+  NotebookPen,
+  Pause,
+  PenTool,
+  Play,
+  SkipBack,
+  SkipForward,
+  StickyNote,
+  Terminal,
+} from 'lucide-react';
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type * as Y from 'yjs';
-import { ThemeToggle } from '@/components/layout';
+import { LogoMark, ThemeToggle } from '@/components/layout';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/card';
+import { Badge, Kbd, Spinner } from '@/components/ui/card';
 import { NativeSelect } from '@/components/ui/form';
-import { monaco } from '@/editor/monaco';
+import { Tooltip } from '@/components/ui/overlay';
+import { monaco, monacoTheme } from '@/editor/monaco';
 import { cn, formatClock } from '@/lib/utils';
 
 // The whiteboard library is large; load it only when the Design tab is opened.
@@ -21,7 +45,33 @@ const ReplayBoard = lazy(() => import('@/design/replay-board'));
 
 const SPEEDS = [1, 2, 4, 8] as const;
 
-export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log: ReplayLog }) {
+const KIND_INFO: Record<ReplayMarkerKind, { label: string; icon: typeof Code2 }> = {
+  code_run: { label: 'Code runs', icon: Terminal },
+  tests_run: { label: 'Test runs', icon: FlaskConical },
+  question_shown: { label: 'Questions', icon: BookOpen },
+  hint_revealed: { label: 'Hints', icon: Lightbulb },
+  paste: { label: 'Pastes', icon: ClipboardPaste },
+  tab_hidden: { label: 'Tab hidden', icon: EyeOff },
+  window_blur: { label: 'Left window', icon: AppWindow },
+  note_timestamp: { label: 'Your notes', icon: StickyNote },
+};
+
+const TONE: Record<ReplayMarker['tone'], string> = {
+  ok: 'bg-success',
+  error: 'bg-destructive',
+  info: 'bg-primary',
+  signal: 'bg-warning',
+};
+
+export function ReplayPlayer({
+  manifest,
+  log,
+  onRound,
+}: {
+  manifest: ReplayManifest;
+  log: ReplayLog;
+  onRound: (round: number) => void;
+}) {
   const cursor = useMemo(() => new ReplayCursor(log), [log]);
   const [start, end] = useMemo(() => {
     const first = log.updates[0]?.ts ?? manifest.startTs;
@@ -34,6 +84,7 @@ export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log:
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const [generation, setGeneration] = useState(0);
   const [tab, setTab] = useState<'discuss' | 'code' | 'design'>('code');
+  const [hiddenKinds, setHiddenKinds] = useState<Set<ReplayMarkerKind>>(new Set());
 
   const seek = useCallback(
     (t: number) => {
@@ -50,7 +101,9 @@ export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log:
 
   // Playback clock.
   const timeRef = useRef(time);
-  timeRef.current = time;
+  useEffect(() => {
+    timeRef.current = time;
+  }, [time]);
   useEffect(() => {
     if (!playing) return;
     let last = performance.now();
@@ -64,22 +117,74 @@ export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log:
     return () => cancelAnimationFrame(frame);
   }, [playing, speed, seek, end]);
 
+  const markers = manifest.markers.filter((m) => !hiddenKinds.has(m.kind));
+  const kinds = [...new Set(manifest.markers.map((m) => m.kind))];
+  const next = markers.find((m) => m.ts > time + 250);
+  const prev = [...markers].reverse().find((m) => m.ts < time - 250);
+
+  const toggle = () => {
+    if (!playing && time >= end) seek(start);
+    setPlaying(!playing);
+  };
+
+  // Space plays/pauses; arrows step between markers.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest('input, textarea, select, [contenteditable=true]'))
+        return;
+      if (e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      } else if (e.key === 'ArrowRight' && next) seek(next.ts);
+      else if (e.key === 'ArrowLeft' && prev) seek(prev.ts);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   const duration = Math.max(1, end - start);
   const pct = (ts: number) => `${((ts - start) / duration) * 100}%`;
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b px-3 py-2">
-        <Button variant="ghost" size="icon" asChild aria-label="Back to dashboard">
-          <Link to="/dashboard">
+      <header className="flex flex-wrap items-center gap-3 border-b bg-card/30 px-3 py-2">
+        <Button variant="ghost" size="icon-sm" asChild aria-label="Back to the session">
+          <Link to={`/sessions/${manifest.room.id}`}>
             <ArrowLeft />
           </Link>
         </Button>
-        <h1 className="min-w-0 flex-1 truncate font-semibold">Replay · {manifest.room.title}</h1>
+        <LogoMark className="size-6" />
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-semibold">{manifest.room.title}</h1>
+          <p className="text-xs text-muted-foreground">Replay</p>
+        </div>
+        {manifest.rounds > 1 && (
+          <div className="flex rounded-lg bg-muted p-0.5" role="tablist" aria-label="Round">
+            {Array.from({ length: manifest.rounds }, (_, i) => i + 1).map((r) => (
+              <button
+                key={r}
+                type="button"
+                role="tab"
+                aria-selected={manifest.round === r}
+                onClick={() => onRound(r)}
+                className={cn(
+                  'h-7 rounded-md px-3 text-[13px] font-medium text-muted-foreground',
+                  manifest.round === r && 'bg-background text-foreground shadow-sm',
+                )}
+              >
+                Round {r}
+              </button>
+            ))}
+          </div>
+        )}
         <ThemeToggle />
       </header>
 
-      <nav role="tablist" aria-label="Replay" className="flex gap-1 border-b px-3">
+      <nav
+        role="tablist"
+        aria-label="Replay"
+        className="flex items-center gap-1 border-b px-3 py-1.5"
+      >
         {(
           [
             { id: 'discuss', label: 'Discuss', icon: NotebookPen },
@@ -94,34 +199,80 @@ export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log:
             aria-selected={tab === id}
             onClick={() => setTab(id)}
             className={cn(
-              '-mb-px flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground',
-              tab === id && 'border-primary text-foreground',
+              'flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+              tab === id && 'bg-muted text-foreground shadow-[inset_0_0_0_1px_var(--border)]',
             )}
           >
-            <Icon className="size-4" />
+            <Icon className={cn('size-4', tab === id && 'text-primary')} />
             {label}
           </button>
         ))}
       </nav>
 
-      <main className="min-h-0 flex-1">
-        {tab === 'discuss' && <ReplayNotes key={generation} doc={cursor.doc} />}
-        {tab === 'code' && <ReplayCode key={generation} doc={cursor.doc} time={time} />}
-        {tab === 'design' && (
-          <Suspense
-            fallback={
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                <Spinner />
-              </div>
-            }
-          >
-            <ReplayBoard doc={cursor.doc} time={time} />
-          </Suspense>
-        )}
-      </main>
+      <div className="flex min-h-0 flex-1">
+        <main className="min-w-0 flex-1">
+          {tab === 'discuss' && <ReplayNotes key={generation} doc={cursor.doc} />}
+          {tab === 'code' && <ReplayCode key={generation} doc={cursor.doc} time={time} />}
+          {tab === 'design' && (
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  <Spinner />
+                </div>
+              }
+            >
+              <ReplayBoard doc={cursor.doc} time={time} />
+            </Suspense>
+          )}
+        </main>
+        <aside
+          aria-label="Key moments"
+          className="hidden w-72 shrink-0 flex-col border-l bg-card/30 lg:flex"
+        >
+          <div className="flex items-center gap-2 border-b px-3 py-2.5 text-sm font-medium">
+            <ListOrdered className="size-4 text-primary" /> Key moments
+            <span className="ml-auto text-xs text-muted-foreground">{markers.length}</span>
+          </div>
+          <ol className="min-h-0 flex-1 overflow-y-auto p-2">
+            {markers.length === 0 && (
+              <li className="px-2 py-6 text-center text-sm text-muted-foreground">
+                Nothing marked in this round.
+              </li>
+            )}
+            {markers.map((m) => {
+              const Icon = KIND_INFO[m.kind].icon;
+              const active = Math.abs(m.ts - time) < 600;
+              return (
+                <li key={`${m.ts}-${m.kind}-${m.label}`}>
+                  <button
+                    type="button"
+                    onClick={() => seek(m.ts)}
+                    className={cn(
+                      'flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-muted',
+                      active && 'bg-accent',
+                    )}
+                  >
+                    <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', TONE[m.tone])} />
+                    <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1">{m.label}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                      {formatClock(m.ts - start)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </aside>
+      </div>
 
-      <footer className="border-t px-3 py-3">
-        <div className="relative mx-1 h-6">
+      <footer className="border-t bg-card/30 px-4 pt-3 pb-3">
+        <div className="relative mx-1 h-7">
+          <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-muted" />
+          <div
+            className="absolute top-1/2 left-0 h-1.5 -translate-y-1/2 rounded-full bg-brand-gradient"
+            style={{ width: pct(time) }}
+          />
           <input
             type="range"
             aria-label="Timeline"
@@ -130,55 +281,105 @@ export function ReplayPlayer({ manifest, log }: { manifest: ReplayManifest; log:
             step={100}
             value={time}
             onChange={(e) => seek(Number(e.target.value))}
-            className="absolute inset-x-0 top-1/2 w-full -translate-y-1/2 accent-[var(--primary)]"
+            className="absolute inset-x-0 top-1/2 w-full -translate-y-1/2 cursor-pointer opacity-0"
           />
-          {manifest.markers.map((m) => (
-            <button
-              key={`${m.ts}-${m.label}`}
-              type="button"
-              title={`${formatClock(m.ts - start)} · ${m.label}`}
-              aria-label={`Jump to ${m.label} at ${formatClock(m.ts - start)}`}
-              onClick={() => seek(m.ts)}
-              className={cn(
-                'absolute top-0 h-2.5 w-1.5 -translate-x-1/2 rounded-sm',
-                m.status === 'ok' ? 'bg-success' : 'bg-destructive',
-              )}
-              style={{ left: pct(m.ts) }}
-            />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-foreground shadow"
+            style={{ left: pct(time) }}
+          />
+          {markers.map((m) => (
+            <Tooltip
+              key={`${m.ts}-${m.kind}-${m.label}`}
+              side="top"
+              content={`${formatClock(m.ts - start)} · ${m.label}`}
+            >
+              <button
+                type="button"
+                aria-label={`Jump to ${m.label} at ${formatClock(m.ts - start)}`}
+                onClick={() => seek(m.ts)}
+                className={cn(
+                  'absolute top-0 h-2.5 w-1.5 -translate-x-1/2 rounded-sm ring-1 ring-background transition-transform hover:scale-y-150',
+                  TONE[m.tone],
+                )}
+                style={{ left: pct(m.ts) }}
+              />
+            </Tooltip>
           ))}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <Button
-            size="sm"
-            onClick={() => {
-              if (!playing && time >= end) seek(start);
-              setPlaying(!playing);
-            }}
-          >
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Tooltip content="Previous moment (←)">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Previous moment"
+              disabled={!prev}
+              onClick={() => prev && seek(prev.ts)}
+            >
+              <SkipBack />
+            </Button>
+          </Tooltip>
+          <Button size="sm" onClick={toggle} className="w-24">
             {playing ? <Pause /> : <Play />}
             {playing ? 'Pause' : 'Play'}
           </Button>
-          <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            Speed
-            <NativeSelect
-              value={speed}
-              onChange={(e) => setSpeed(Number(e.target.value) as (typeof SPEEDS)[number])}
-              className="h-8"
+          <Tooltip content="Next moment (→)">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Next moment"
+              disabled={!next}
+              onClick={() => next && seek(next.ts)}
             >
-              {SPEEDS.map((s) => (
-                <option key={s} value={s}>
-                  {s}×
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
-          <span className="font-mono text-sm tabular-nums text-muted-foreground">
+              <SkipForward />
+            </Button>
+          </Tooltip>
+          <NativeSelect
+            aria-label="Playback speed"
+            value={speed}
+            onChange={(e) => setSpeed(Number(e.target.value) as (typeof SPEEDS)[number])}
+            className="h-8"
+          >
+            {SPEEDS.map((s) => (
+              <option key={s} value={s}>
+                {s}×
+              </option>
+            ))}
+          </NativeSelect>
+          <span className="font-mono text-sm text-muted-foreground tabular-nums">
             {formatClock(time - start)} / {formatClock(duration)}
           </span>
-          <span className="ml-auto text-xs text-muted-foreground">
-            {manifest.markers.length} code run{manifest.markers.length === 1 ? '' : 's'} · click a
-            marker to jump
+          <span className="hidden items-center gap-1 text-xs text-muted-foreground md:flex">
+            <Kbd>Space</Kbd> play
           </span>
+          <div className="ml-auto flex flex-wrap gap-1">
+            {kinds.map((k) => {
+              const off = hiddenKinds.has(k);
+              const Icon = KIND_INFO[k].icon;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={!off}
+                  onClick={() =>
+                    setHiddenKinds((s) => {
+                      const n = new Set(s);
+                      if (n.has(k)) n.delete(k);
+                      else n.add(k);
+                      return n;
+                    })
+                  }
+                  className={cn(
+                    'flex h-7 items-center gap-1 rounded-full border px-2 text-[11px] transition-opacity',
+                    off ? 'opacity-40' : 'bg-background',
+                  )}
+                >
+                  <Icon className="size-3" /> {KIND_INFO[k].label}
+                </button>
+              );
+            })}
+            {kinds.length === 0 && <Badge>No markers</Badge>}
+          </div>
         </div>
       </footer>
     </div>
@@ -219,7 +420,8 @@ function ReplayCode({ doc, time }: { doc: Y.Doc; time: number }) {
       minimap: { enabled: false },
       fontSize: 14,
       scrollBeyondLastLine: false,
-      theme: document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs',
+      theme: monacoTheme(),
+      fontFamily: "'Geist Mono Variable', 'Cascadia Code', Consolas, monospace",
     });
     editorRef.current = editor;
     return () => {

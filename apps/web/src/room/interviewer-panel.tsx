@@ -42,10 +42,11 @@ import { Input, NativeSelect, Textarea } from '@/components/ui/form';
 import { api } from '@/lib/api';
 import { useDocVersion } from '@/lib/use-doc';
 import { cn, formatClock } from '@/lib/utils';
+import { SignalList, type Signal } from './activity-feed';
 import type { RoomConnection } from './use-room';
 import type { PrivateDoc } from './use-private-doc';
 
-type PanelTab = 'questions' | 'notes' | 'rubric';
+type PanelTab = 'questions' | 'notes' | 'rubric' | 'activity';
 
 interface Props {
   room: Room;
@@ -56,6 +57,7 @@ interface Props {
   user: { participantId: string; name: string; color: string; role: string };
   sessionStart: number;
   runningTestsFor: string | null;
+  signals: Signal[];
 }
 
 /** The interviewer-only sidebar. Candidates never load it, and the server refuses them its data. */
@@ -73,22 +75,29 @@ export function InterviewerPanel(props: Props) {
           <Spinner className="size-3" /> Running tests for {props.runningTestsFor} in your browser…
         </p>
       )}
-      <nav role="tablist" aria-label="Interviewer tools" className="flex gap-1 border-b px-2">
-        {(['questions', 'notes', 'rubric'] as const).map((t) => (
-          <button
-            key={t}
-            role="tab"
-            type="button"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={cn(
-              '-mb-px border-b-2 border-transparent px-2.5 py-2 text-sm font-medium text-muted-foreground capitalize hover:text-foreground',
-              tab === t && 'border-primary text-foreground',
-            )}
-          >
-            {t}
-          </button>
-        ))}
+      <nav role="tablist" aria-label="Interviewer tools" className="border-b p-2">
+        <div className="grid grid-cols-4 rounded-lg bg-muted p-0.5">
+          {(['questions', 'notes', 'rubric', 'activity'] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              type="button"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={cn(
+                'h-7 rounded-md text-[13px] font-medium text-muted-foreground capitalize transition-colors hover:text-foreground',
+                tab === t && 'bg-background text-foreground shadow-sm',
+              )}
+            >
+              {t}
+              {t === 'activity' && props.signals.length > 0 && (
+                <span className="ml-1 rounded-full bg-warning/20 px-1 text-[10px] text-warning">
+                  {props.signals.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </nav>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === 'questions' && <QuestionsTab {...props} />}
@@ -100,6 +109,20 @@ export function InterviewerPanel(props: Props) {
           ))}
         {tab === 'rubric' &&
           (props.privateDoc ? <Rubric privateDoc={props.privateDoc} /> : <PanelLoading />)}
+        {tab === 'activity' && (
+          <div className="p-3">
+            <SignalCounts signals={props.signals} />
+            <p className="mt-3 text-xs text-muted-foreground">
+              Everyone in the room sees these signals. They show what happened, not why — ask before
+              drawing conclusions.
+            </p>
+            <SignalList
+              signals={props.signals}
+              sessionStart={props.sessionStart}
+              className="mt-3"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -513,5 +536,25 @@ function Rubric({ privateDoc }: { privateDoc: PrivateDoc }) {
         );
       })}
     </div>
+  );
+}
+
+function SignalCounts({ signals }: { signals: Signal[] }) {
+  const count = (kind: Signal['kind']) => signals.filter((s) => s.kind === kind).length;
+  const items = [
+    { label: 'Pastes', value: count('paste') },
+    { label: 'Large inserts', value: count('large_insert') },
+    { label: 'Tab hidden', value: count('tab_hidden') },
+    { label: 'Left window', value: count('window_blur') },
+  ];
+  return (
+    <dl className="grid grid-cols-2 gap-2">
+      {items.map((i) => (
+        <div key={i.label} className="rounded-lg border bg-background/60 px-3 py-2">
+          <dt className="text-[11px] text-muted-foreground">{i.label}</dt>
+          <dd className="font-mono text-lg font-semibold tabular-nums">{i.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

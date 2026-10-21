@@ -1,22 +1,24 @@
 import type { ReplayManifest } from '@sidebyside/shared';
 import { decodeReplayLog } from '@sidebyside/shared/replay';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { AppShell } from '@/components/layout';
 import { ErrorNote, Spinner } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { ReplayPlayer } from '@/replay/replay-player';
 
-/** `/rooms/:id/replay` */
+/** `/rooms/:id/replay?round=` */
 export default function ReplayPage() {
   const { id = '' } = useParams();
+  const [params, setParams] = useSearchParams();
+  const round = Number(params.get('round') ?? 1) || 1;
   const manifest = useQuery({
-    queryKey: ['replay-manifest', id],
-    queryFn: () => api.json<ReplayManifest>(`/rooms/${id}/replay/manifest`),
+    queryKey: ['replay-manifest', id, round],
+    queryFn: () => api.json<ReplayManifest>(`/rooms/${id}/replay/manifest?round=${round}`),
   });
   const log = useQuery({
-    queryKey: ['replay-log', id],
-    queryFn: async () => decodeReplayLog(await api.bytes(`/rooms/${id}/replay/log`)),
+    queryKey: ['replay-log', id, round],
+    queryFn: async () => decodeReplayLog(await api.bytes(`/rooms/${id}/replay/log?round=${round}`)),
     enabled: manifest.isSuccess,
     staleTime: Infinity,
   });
@@ -32,10 +34,17 @@ export default function ReplayPage() {
   }
   if (!manifest.data || !log.data) {
     return (
-      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Spinner /> Loading the replay…
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+        <Spinner className="size-5 text-primary" /> Loading the replay…
       </div>
     );
   }
-  return <ReplayPlayer manifest={manifest.data} log={log.data} />;
+  return (
+    <ReplayPlayer
+      key={round}
+      manifest={manifest.data}
+      log={log.data}
+      onRound={(r) => setParams(r === 1 ? {} : { round: String(r) })}
+    />
+  );
 }

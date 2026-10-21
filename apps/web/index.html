@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0b10" />
     <meta
       name="description"
       content="Live technical interviews: shared notes, a real code editor and replays, from one link."
@@ -10,12 +11,12 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>SideBySide</title>
     <script>
-      // Apply the saved theme before first paint to avoid a flash.
+      // Dark unless the visitor chose light; applied before first paint to avoid a flash.
+      let dark = true;
       try {
-        const t = localStorage.getItem('sbs-theme');
-        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches))
-          document.documentElement.classList.add('dark');
+        dark = localStorage.getItem('sbs-theme') !== 'light';
       } catch {}
+      if (dark) document.documentElement.classList.add('dark');
     </script>
   </head>
   <body>

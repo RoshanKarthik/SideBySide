@@ -38,3 +38,32 @@ export function formatClock(ms: number): string {
   const ss = String(s).padStart(2, '0');
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
+
+const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['year', 365 * 24 * 3600],
+  ['month', 30 * 24 * 3600],
+  ['week', 7 * 24 * 3600],
+  ['day', 24 * 3600],
+  ['hour', 3600],
+  ['minute', 60],
+];
+
+/** "3 hours ago", "yesterday", "just now". */
+export function timeAgo(date: Date | string | number, now = Date.now()): string {
+  const seconds = Math.round((new Date(date).getTime() - now) / 1000);
+  for (const [unit, size] of STEPS) {
+    if (Math.abs(seconds) >= size) return RELATIVE.format(Math.round(seconds / size), unit);
+  }
+  return 'just now';
+}
+
+/** "1 h 5 min", "42 min", "30 s". */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  if (h) return m ? `${h} h ${m} min` : `${h} h`;
+  if (m) return `${m} min`;
+  return `${total} s`;
+}

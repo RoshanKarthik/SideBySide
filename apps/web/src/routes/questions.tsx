@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { AppShell } from '@/components/layout';
 import { Button } from '@/components/ui/button';
-import { Badge, Card, ErrorNote, Spinner } from '@/components/ui/card';
+import { Badge, Card, ErrorNote, PageHeader, Skeleton, Spinner } from '@/components/ui/card';
 import { Input, NativeSelect } from '@/components/ui/form';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
@@ -41,23 +41,21 @@ export default function QuestionsPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">Question bank</h1>
-            <p className="text-sm text-muted-foreground">
-              Your questions plus the public practice bank. Duplicate a public question to edit it.
-            </p>
-          </div>
-          <Button asChild>
-            <Link to="/questions/new">
-              <Plus /> New question
-            </Link>
-          </Button>
-        </div>
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10">
+        <PageHeader
+          title="Question bank"
+          description="Your questions plus the public practice bank. Duplicate a public question to edit it."
+          actions={
+            <Button variant="glow" asChild>
+              <Link to="/questions/new">
+                <Plus /> New question
+              </Link>
+            </Button>
+          }
+        />
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          <div role="tablist" aria-label="Show" className="flex rounded-md border p-0.5">
+          <div role="tablist" aria-label="Show" className="flex rounded-lg bg-muted p-0.5">
             {(
               [
                 ['all', 'All'],
@@ -72,8 +70,8 @@ export default function QuestionsPage() {
                 aria-selected={scope === value}
                 onClick={() => setScope(value)}
                 className={cn(
-                  'rounded px-3 py-1 text-sm',
-                  scope === value ? 'bg-muted font-medium' : 'text-muted-foreground',
+                  'h-7 rounded-md px-3 text-[13px] font-medium',
+                  scope === value ? 'bg-background shadow-sm' : 'text-muted-foreground',
                 )}
               >
                 {label}
@@ -104,7 +102,13 @@ export default function QuestionsPage() {
           </NativeSelect>
         </div>
 
-        {list.isPending && <Spinner className="mt-10" />}
+        {list.isPending && (
+          <div className="mt-6 grid gap-2">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-[76px] rounded-xl" />
+            ))}
+          </div>
+        )}
         {list.error && <ErrorNote>{list.error.message}</ErrorNote>}
         {list.data && items.length === 0 && (
           <Card className="mt-6 p-8 text-center text-muted-foreground">
@@ -139,7 +143,7 @@ function QuestionRow({ item }: { item: QuestionSummary }) {
   });
 
   return (
-    <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
+    <Card className="card-glow flex flex-wrap items-center justify-between gap-3 p-4">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <Link to={`/questions/${item.id}`} className="truncate font-medium hover:underline">

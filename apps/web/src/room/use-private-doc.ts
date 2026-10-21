@@ -1,4 +1,4 @@
-import type { Room } from '@sidebyside/shared';
+import { roomDocumentName, type Room } from '@sidebyside/shared';
 import { useEffect, useState } from 'react';
 import YProvider from 'y-partyserver/provider';
 import * as Y from 'yjs';
@@ -19,7 +19,7 @@ export function usePrivateDoc(room: Room, enabled: boolean): PrivateDoc | null {
 
   useEffect(() => {
     if (!enabled) return;
-    const name = `${room.id}--private`;
+    const name = roomDocumentName(room.id, 'private', room.currentRound);
     const doc = new Y.Doc();
     // Interviewers are always signed in, so the session cookie authenticates the socket.
     const provider = new YProvider(window.location.host, name, doc, {
@@ -30,7 +30,7 @@ export function usePrivateDoc(room: Room, enabled: boolean): PrivateDoc | null {
     const onSync = (s: boolean) => setSynced(s);
     provider.on('sync', onSync);
     const onClose = (event: CloseEvent) => {
-      if (event.code === 4000 || event.code === 4401) provider.disconnect();
+      if (event.code === 4000 || event.code === 4001 || event.code === 4401) provider.disconnect();
     };
     provider.on('connection-close', onClose);
     // Created by this effect and destroyed by its cleanup.
@@ -44,7 +44,7 @@ export function usePrivateDoc(room: Room, enabled: boolean): PrivateDoc | null {
       setLive(null);
       setSynced(false);
     };
-  }, [room.id, enabled]);
+  }, [room.id, room.currentRound, enabled]);
 
   return live ? { ...live, synced } : null;
 }

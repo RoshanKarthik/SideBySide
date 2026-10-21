@@ -33,16 +33,13 @@ import { Badge } from '@/components/ui/card';
 import { NativeSelect, Textarea } from '@/components/ui/form';
 import { useDocVersion } from '@/lib/use-doc';
 import { cn } from '@/lib/utils';
+import { reportPaste } from '@/room/integrity';
 import { ProblemPanel } from '@/room/problem-panel';
 import type { RoomConnection } from '@/room/use-room';
 import { CodeRunner, type RunPhase } from '@/runner/runner';
-import { monaco } from './monaco';
+import { monaco, monacoTheme } from './monaco';
 import { remoteCursorCss } from './remote-cursors';
 import { applyTextDiff } from './text-binding';
-
-function monacoTheme(): string {
-  return document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs';
-}
 
 export default function CodePanel({
   conn,
@@ -68,7 +65,8 @@ export default function CodePanel({
       automaticLayout: true,
       minimap: { enabled: false },
       fontSize: 14,
-      fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
+      fontFamily: "'Geist Mono Variable', 'Cascadia Code', Consolas, monospace",
+      fontLigatures: true,
       scrollBeyondLastLine: false,
       tabSize: 4,
       theme: monacoTheme(),
@@ -105,6 +103,16 @@ export default function CodePanel({
       // checking one, and disposing it mid-check throws inside Monaco.
     };
   }, [editor, conn.doc, conn.provider, conn.synced, language]);
+
+  // Pastes are activity signals everyone in the room sees.
+  useEffect(() => {
+    if (!editor) return;
+    const sub = editor.onDidPaste((e) => {
+      const text = editor.getModel()?.getValueInRange(e.range) ?? '';
+      reportPaste(conn, 'code', text);
+    });
+    return () => sub.dispose();
+  }, [editor, conn.doc, conn.provider]); // eslint-disable-line react-hooks/exhaustive-deps -- conn is rebuilt every render; doc and provider identify it.
 
   useEffect(() => {
     editor?.updateOptions({

@@ -1,15 +1,37 @@
 import { isInterviewerRole, type JoinRoomResponse, type PresenceState } from '@sidebyside/shared';
-import { useMutation } from '@tanstack/react-query';
-import { Code2, NotebookPen, PanelRight, PenTool, X } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeftRight,
+  Check,
+  Code2,
+  Flag,
+  Link2,
+  Lock,
+  NotebookPen,
+  PanelRight,
+  PenTool,
+  X,
+} from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { Logo, ThemeToggle } from '@/components/layout';
+import { LogoMark, ThemeToggle } from '@/components/layout';
 import { Button } from '@/components/ui/button';
-import { ErrorNote, Spinner } from '@/components/ui/card';
+import { Badge, ErrorNote, Spinner } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTrigger,
+  Tooltip,
+} from '@/components/ui/overlay';
+import { toast } from '@/components/ui/toaster';
 import { api } from '@/lib/api';
 import { cn, colorFor } from '@/lib/utils';
 import { NotesEditor } from '@/notes/notes-editor';
+import { ActivityStrip, describeSignals, useSignals } from './activity-feed';
+import { reportPaste, useIntegritySignals } from './integrity';
 import { InterviewerPanel } from './interviewer-panel';
+import { JoinNotice, RateYourPartner } from './room-extras';
 import { ConnectionIndicator, PresenceAvatars, SessionTimer } from './top-bar';
 import { usePrivateDoc } from './use-private-doc';
 import { useRoom } from './use-room';
@@ -38,10 +60,27 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
   const runningTestsFor = useTestHost(conn, room, slug, interviewer);
   const [panelOpen, setPanelOpen] = useState(false);
   const [startedAt] = useState(() => (room.startedAt ? Date.parse(room.startedAt) : Date.now()));
+  const queryClient = useQueryClient();
+  const practice = room.mode === 'practice';
 
   const end = useMutation({
     mutationFn: () => api.json(`/rooms/${room.id}/end`, { method: 'POST', roomKey: slug }),
   });
+  const swap = useMutation({
+    mutationFn: () => api.json(`/rooms/${room.id}/rounds/next`, { method: 'POST', roomKey: slug }),
+  });
+
+  useIntegritySignals(conn);
+  const { events: signalEvents, names } = useSignals(conn, room.id, slug);
+  const signals = describeSignals(signalEvents, participant.id, names);
+
+  // Practice: the peers swapped roles. Reload who we are, which reopens the room in round 2.
+  const roundChanged = conn?.roundChanged ?? null;
+  useEffect(() => {
+    if (roundChanged === null) return;
+    toast.success(`Round ${roundChanged}: roles swapped`);
+    void queryClient.invalidateQueries({ queryKey: ['room-me', slug] });
+  }, [roundChanged, queryClient, slug]);
 
   // Development only: lets browser tests inspect the shared document.
   useEffect(() => {
@@ -52,8 +91,19 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
 
   if (!conn) return null;
   if (conn.ended || end.isSuccess) {
-    return <SessionEnded title={room.title} roomId={room.id} interviewer={interviewer} />;
+    return (
+      <SessionEnded
+        title={room.title}
+        roomId={room.id}
+        interviewer={interviewer || practice}
+        practice={practice}
+        slug={slug}
+      />
+    );
   }
+  const partner = practice
+    ? conn.peers.find((p) => p.state.user.participantId !== participant.id)?.state.user.name
+    : undefined;
 
   const switchTab = (next: Tab) => {
     if (next === tab) return;
@@ -73,33 +123,28 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-3 py-2">
-        <div className="hidden sm:block">
-          <Logo />
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-card/30 px-3 py-2">
+        <Link
+          to={interviewer ? '/dashboard' : '#'}
+          aria-label={interviewer ? 'Back to dashboard' : 'SideBySide'}
+          className="shrink-0"
+        >
+          <LogoMark />
+        </Link>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h1 className="truncate font-semibold">{room.title}</h1>
+          {room.mode === 'practice' && <Badge tone="info">Practice</Badge>}
+          {conn.locked && (
+            <Badge tone="warning">
+              <Lock className="size-3" /> Locked
+            </Badge>
+          )}
         </div>
-        <h1 className="min-w-0 flex-1 truncate font-semibold">{room.title}</h1>
         <SessionTimer startedAt={startedAt} />
         <ConnectionIndicator status={conn.status} />
         <PresenceAvatars peers={conn.peers} selfClientId={conn.doc.clientID} />
-        {interviewer && (
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={end.isPending}
-            onClick={() => {
-              if (
-                window.confirm(
-                  'End the session for everyone? The room will close and the replay will be saved.',
-                )
-              ) {
-                end.mutate();
-              }
-            }}
-          >
-            {end.isPending && <Spinner />}
-            End session
-          </Button>
-        )}
+        {interviewer && !practice && <CopyCandidateLink slug={slug} />}
+        {interviewer && <EndSessionButton pending={end.isPending} onConfirm={() => end.mutate()} />}
         {interviewer && (
           <Button
             variant="outline"
@@ -114,7 +159,11 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
         <ThemeToggle />
       </header>
 
-      <nav role="tablist" aria-label="Room" className="flex gap-1 border-b px-3">
+      <nav
+        role="tablist"
+        aria-label="Room"
+        className="flex items-center gap-1 border-b px-3 py-1.5"
+      >
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -123,25 +172,55 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
             aria-selected={tab === id}
             onClick={() => switchTab(id)}
             className={cn(
-              '-mb-px flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground',
-              tab === id && 'border-primary text-foreground',
+              'flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+              tab === id && 'bg-muted text-foreground shadow-[inset_0_0_0_1px_var(--border)]',
             )}
           >
-            <Icon className="size-4" />
+            <Icon className={cn('size-4', tab === id && 'text-primary')} />
             {label}
             <TabPeers peers={conn.peers} tab={id} self={conn.doc.clientID} />
           </button>
         ))}
       </nav>
 
-      {(end.error || conn.serverError) && (
+      {practice && (
+        <div className="flex flex-wrap items-center gap-3 border-b bg-primary/[0.06] px-3 py-2 text-sm">
+          <Badge tone="info">Round {room.currentRound} of 2</Badge>
+          <span>
+            {interviewer ? (
+              <>
+                <strong>You interview</strong>, {partner ?? 'your partner'} solves. Pick a question
+                in the panel.
+              </>
+            ) : (
+              <>
+                {partner ?? 'Your partner'} interviews, <strong>you solve</strong>.
+              </>
+            )}
+          </span>
+          {room.currentRound < 2 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto"
+              disabled={swap.isPending}
+              onClick={() => swap.mutate()}
+            >
+              {swap.isPending ? <Spinner /> : <ArrowLeftRight />} Swap roles
+            </Button>
+          )}
+        </div>
+      )}
+      {!interviewer && !practice && <JoinNotice slug={slug} />}
+
+      {(end.error || swap.error || conn.serverError) && (
         <div className="px-3 pt-2">
-          <ErrorNote>{end.error?.message ?? conn.serverError}</ErrorNote>
+          <ErrorNote>{end.error?.message ?? swap.error?.message ?? conn.serverError}</ErrorNote>
         </div>
       )}
 
       <div className="flex min-h-0 flex-1">
-        <main className="relative min-w-0 flex-1">
+        <main className="relative flex min-w-0 flex-1 flex-col">
           {!conn.synced && (
             <div className="absolute inset-x-0 top-0 z-10 flex justify-center p-2">
               <span className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
@@ -149,16 +228,17 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
               </span>
             </div>
           )}
-          <section role="tabpanel" hidden={tab !== 'discuss'} className="h-full">
+          <section role="tabpanel" hidden={tab !== 'discuss'} className="min-h-0 flex-1">
             <NotesEditor
               doc={conn.doc}
               provider={conn.provider}
               user={user}
               editable={interviewer || !conn.locked}
+              onPaste={(text) => reportPaste(conn, 'notes', text)}
             />
           </section>
           {codeOpened && (
-            <section role="tabpanel" hidden={tab !== 'code'} className="h-full">
+            <section role="tabpanel" hidden={tab !== 'code'} className="min-h-0 flex-1">
               <Suspense
                 fallback={
                   <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -171,7 +251,7 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
             </section>
           )}
           {designOpened && (
-            <section role="tabpanel" hidden={tab !== 'design'} className="h-full">
+            <section role="tabpanel" hidden={tab !== 'design'} className="min-h-0 flex-1">
               <Suspense
                 fallback={
                   <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -188,6 +268,7 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
               </Suspense>
             </section>
           )}
+          {!interviewer && <ActivityStrip signals={signals} sessionStart={startedAt} />}
         </main>
         {interviewer && (
           <>
@@ -201,7 +282,7 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
             <aside
               aria-label="Interviewer panel"
               className={cn(
-                'fixed inset-y-0 right-0 z-40 w-[22rem] max-w-full border-l bg-background transition-transform lg:static lg:z-auto lg:translate-x-0',
+                'fixed inset-y-0 right-0 z-40 w-[22rem] max-w-full border-l bg-background transition-transform lg:static lg:bg-card/30 lg:z-auto lg:translate-x-0',
                 panelOpen ? 'translate-x-0' : 'translate-x-full',
               )}
             >
@@ -223,6 +304,7 @@ export function RoomView({ slug, membership }: { slug: string; membership: JoinR
                 user={user}
                 sessionStart={startedAt}
                 runningTestsFor={runningTestsFor}
+                signals={signals}
               />
             </aside>
           </>
@@ -260,29 +342,88 @@ function SessionEnded({
   title,
   roomId,
   interviewer,
+  practice,
+  slug,
 }: {
   title: string;
   roomId: string;
   interviewer: boolean;
+  practice: boolean;
+  slug: string;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-      <h1 className="text-2xl font-bold">Session ended</h1>
-      <p className="text-muted-foreground">{title}</p>
+    <div className="relative isolate flex h-full flex-col items-center justify-center overflow-y-auto px-4 py-10 text-center">
+      <div className="bg-dots mask-radial absolute inset-0 -z-10 opacity-60" />
+      <div className="absolute top-1/3 left-1/2 -z-10 h-72 w-[560px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,var(--glow),transparent)] blur-2xl" />
+      <div className="flex size-12 animate-fade-up items-center justify-center rounded-2xl border bg-card shadow-lg">
+        <Flag className="size-5 text-primary" />
+      </div>
+      <h1 className="mt-5 text-2xl font-semibold tracking-tight">Session ended</h1>
+      <p className="mt-1 text-muted-foreground">{title}</p>
+      {practice && <RateYourPartner roomId={roomId} slug={slug} />}
       {interviewer ? (
-        <div className="mt-2 flex gap-2">
-          <Button asChild>
-            <Link to={`/rooms/${roomId}/replay`}>Watch the replay</Link>
+        <div className="mt-8 flex flex-wrap justify-center gap-2">
+          <Button variant={practice ? 'outline' : 'glow'} asChild>
+            <Link to={`/sessions/${roomId}`}>Open the session summary</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link to="/dashboard">Dashboard</Link>
+            <Link to={`/rooms/${roomId}/replay`}>Watch the replay</Link>
           </Button>
         </div>
       ) : (
-        <p className="max-w-sm text-sm text-muted-foreground">
-          Thanks for joining. You can close this tab.
+        <p className="mt-4 max-w-sm text-sm text-muted-foreground">
+          Thanks for joining — you can close this tab now.
         </p>
       )}
     </div>
+  );
+}
+
+function CopyCandidateLink({ slug }: { slug: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Tooltip content="Copy the link candidates use to join">
+      <Button
+        variant="outline"
+        size="sm"
+        className="hidden md:inline-flex"
+        onClick={async () => {
+          await navigator.clipboard.writeText(`${window.location.origin}/r/${slug}`);
+          setCopied(true);
+          toast.success('Room link copied');
+          setTimeout(() => setCopied(false), 1500);
+        }}
+      >
+        {copied ? <Check /> : <Link2 />} {copied ? 'Copied' : 'Copy link'}
+      </Button>
+    </Tooltip>
+  );
+}
+
+function EndSessionButton({ pending, onConfirm }: { pending: boolean; onConfirm: () => void }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="destructive" size="sm" disabled={pending}>
+          {pending && <Spinner />}
+          End session
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        title="End the session for everyone?"
+        description="The room closes for all participants and the replay is saved. This can't be undone."
+      >
+        <div className="mt-6 flex justify-end gap-2">
+          <DialogClose asChild>
+            <Button variant="ghost">Keep going</Button>
+          </DialogClose>
+          <DialogClose asChild>
+            <Button variant="destructive" onClick={onConfirm}>
+              End session
+            </Button>
+          </DialogClose>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { Button } from '@/components/ui/button';
 import { useCurrentTheme } from '@/lib/theme';
+import { isLowBandwidth } from '@/lib/use-me';
 import type { RoomConnection } from '@/room/use-room';
 import { LOCAL_ORIGIN, readElements, writeElements } from './board-sync';
 import { asBoard, asExcalidraw } from './excalidraw-setup';
@@ -32,6 +33,7 @@ import { BOARD_TEMPLATES, type BoardTemplate } from './templates';
 /** How often local drawing is written to the shared doc, and pointers to awareness. */
 const FLUSH_MS = 50;
 const POINTER_MS = 60;
+const POINTER_MS_LOW_BANDWIDTH = 400;
 
 interface Props {
   conn: RoomConnection;
@@ -90,9 +92,12 @@ export default function DesignBoard({ conn, interviewer, active, readOnly }: Pro
     if (elements && !readOnlyRef.current) writeElements(board, asBoard(elements));
   }, [board]);
   useEffect(() => flush, [flush]);
+  const pointerDown = useRef(false);
   const onSceneChange = (elements: readonly OrderedExcalidrawElement[]) => {
     if (readOnlyRef.current) return;
     pending.current = elements;
+    // Low-bandwidth mode sends a drag once, when the pointer is released.
+    if (isLowBandwidth() && pointerDown.current) return;
     flushTimer.current ??= setTimeout(flush, FLUSH_MS);
   };
 
@@ -106,9 +111,13 @@ export default function DesignBoard({ conn, interviewer, active, readOnly }: Pro
     pointer: Omit<BoardPointer, 'button'>;
     button: 'up' | 'down';
   }) => {
+    const wasDown = pointerDown.current;
+    pointerDown.current = button === 'down';
+    if (wasDown && button === 'up' && pending.current) flush();
     const now = performance.now();
     const last = lastPointer.current;
-    if (button === last.button && now - last.at < POINTER_MS) return;
+    const every = isLowBandwidth() ? POINTER_MS_LOW_BANDWIDTH : POINTER_MS;
+    if (button === last.button && now - last.at < every) return;
     lastPointer.current = { at: now, button };
     const value: BoardPointer = {
       x: Math.round(pointer.x),
