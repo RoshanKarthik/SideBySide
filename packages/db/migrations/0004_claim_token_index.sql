@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "participants_claim_token_idx" ON "participants" USING btree ("claim_token") WHERE "participants"."claim_token" is not null;

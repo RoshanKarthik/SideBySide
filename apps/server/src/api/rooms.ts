@@ -113,7 +113,12 @@ export function roomRoutes(deps: AppDeps) {
     const user = await requireUser(c);
     const db = c.var.db;
     const rows = await db
-      .select({ room: rooms, role: participants.role, me: participants.id })
+      .select({
+        room: rooms,
+        role: participants.role,
+        me: participants.id,
+        myName: participants.displayName,
+      })
       .from(participants)
       .innerJoin(rooms, eq(rooms.id, participants.roomId))
       .where(eq(participants.userId, user.id))
@@ -165,7 +170,8 @@ export function roomRoutes(deps: AppDeps) {
       return {
         ...toRoomDto(r.room),
         myRole: r.role,
-        candidateName: candidateOf.get(r.room.id) ?? null,
+        // A candidate who claimed their seat sees the session listed under their own name.
+        candidateName: r.role === 'candidate' ? r.myName : (candidateOf.get(r.room.id) ?? null),
         score: s?.score ?? null,
         testsPassed: s?.passed ?? null,
         testsTotal: s?.total ?? null,

@@ -163,6 +163,7 @@ export const participants = pgTable(
     consentAcceptedAt: timestamp('consent_accepted_at', { withTimezone: true }),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
     leftAt: timestamp('left_at', { withTimezone: true }),
+    /** SHA-256 of the token a guest candidate uses to attach this seat to an account later. */
     claimToken: text('claim_token'),
     createdAt: createdAt(),
   },
@@ -171,6 +172,9 @@ export const participants = pgTable(
     uniqueIndex('participants_room_user_idx')
       .on(t.roomId, t.userId)
       .where(sql`${t.userId} is not null`),
+    uniqueIndex('participants_claim_token_idx')
+      .on(t.claimToken)
+      .where(sql`${t.claimToken} is not null`),
   ],
 );
 

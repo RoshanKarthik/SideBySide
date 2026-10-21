@@ -39,6 +39,7 @@ export default function LoginPage() {
   const social = providers.data?.providers.filter((p) => p !== 'dev') ?? [];
   const devLogin = providers.data?.providers.includes('dev') ?? false;
   const invited = next.includes('invite=');
+  const claiming = next.startsWith('/claim/');
 
   return (
     <AuthLayout>
@@ -48,7 +49,9 @@ export default function LoginPage() {
       <p className="mt-2 text-sm text-muted-foreground">
         {invited
           ? 'Sign in to join the room as a co-interviewer.'
-          : 'Interviewers sign in to create rooms. Candidates join from a link — no account needed.'}
+          : claiming
+            ? 'Your interview, and the feedback shared with you, will be saved to this account.'
+            : 'Interviewers sign in to create rooms. Candidates join from a link — no account needed.'}
       </p>
       <div className="mt-8 space-y-3">
         {providers.isPending && (

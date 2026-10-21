@@ -70,6 +70,30 @@ export function canViewReplay(storedRole: RoomRole, room: RoomAccessFacts): bool
   return storedRole === 'candidate' && room.shareReplayWithCandidate;
 }
 
+export interface ClaimFacts {
+  status: RoomStatus;
+  mode: string;
+  shareReplayWithCandidate: boolean;
+  shareReportWithCandidate: boolean;
+}
+
+/**
+ * A guest candidate can attach an ended interview to an account, to keep its replay or report,
+ * when the interviewer shared one of them. Seats that already belong to an account can't be.
+ */
+export function canClaimSession(
+  participant: { role: RoomRole; userId: string | null },
+  room: ClaimFacts,
+): boolean {
+  return (
+    participant.role === 'candidate' &&
+    participant.userId === null &&
+    room.mode === 'interview' &&
+    room.status === 'ended' &&
+    (room.shareReplayWithCandidate || room.shareReportWithCandidate)
+  );
+}
+
 /** The session summary page: interviewers, and practice peers (each sees only their own rubric). */
 export function canViewSummary(storedRole: RoomRole): boolean {
   return isInterviewerRole(storedRole) || storedRole === 'peer';
