@@ -15,6 +15,7 @@ import {
   clientMessageSchema,
   eventVisibility,
   isInterviewerRole,
+  parseRoomDocumentName,
   type ClientMessage,
   type EventType,
   type Lang,
@@ -119,12 +120,23 @@ export class Room extends YServer {
     return this.ctx.storage.sql;
   }
 
+  private get target() {
+    const parsed = parseRoomDocumentName(this.name);
+    if (!parsed) throw new Error(`Bad room document name: ${this.name}`);
+    return parsed;
+  }
+
   private get part(): DocumentPart {
-    return this.name.endsWith('--private') ? 'private' : 'shared';
+    return this.target.part;
   }
 
   private get roomId(): string {
-    return this.name.split('--')[0]!;
+    return this.target.roomId;
+  }
+
+  /** Practice rooms record each round in its own documents. */
+  private get round(): number {
+    return this.target.round;
   }
 
   override async onLoad(): Promise<void> {
@@ -302,6 +314,38 @@ export class Room extends YServer {
     for (const connection of this.getConnections()) {
       connection.close(CLOSE_CODES.sessionEnded, 'Session ended');
     }
+  }
+
+  /**
+   * Practice: this round is over and the next one starts in fresh documents. Everyone is
+   * disconnected with a code that tells the client to reconnect to the new round.
+   */
+  async closeRound(nextRound: number): Promise<void> {
+    if (this.ended) return;
+    if (this.part === 'private') await this.persistRubric();
+    this.flush();
+    this.writeSnapshot(this.lastUpdateId());
+    this.ended = true;
+    this.writeMeta('ended', 'true');
+    for (const req of this.testRequests.values()) clearTimeout(req.timer);
+    this.testRequests.clear();
+    this.broadcastMessage({ kind: 'round_changed', round: nextRound });
+    for (const connection of this.getConnections()) {
+      connection.close(CLOSE_CODES.roundChanged, 'Next round');
+    }
+  }
+
+  /** Deletes everything this document stored (session or account deletion). */
+  async purge(): Promise<void> {
+    for (const req of this.testRequests.values()) clearTimeout(req.timer);
+    this.testRequests.clear();
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.pending = [];
+    this.ended = true;
+    for (const connection of this.getConnections()) {
+      connection.close(CLOSE_CODES.sessionEnded, 'Session deleted');
+    }
+    await this.ctx.storage.deleteAll();
   }
 
   async showQuestion(actor: Actor, input: ShowQuestionInput): Promise<void> {
@@ -512,7 +556,13 @@ export class Room extends YServer {
         const comment = typeof entry.comment === 'string' ? entry.comment.slice(0, 2000) : '';
         await db
           .insert(rubricScores)
-          .values({ roomId, roundNumber: 1, criterion: criterion.slice(0, 120), score, comment })
+          .values({
+            roomId,
+            roundNumber: this.round,
+            criterion: criterion.slice(0, 120),
+            score,
+            comment,
+          })
           .onConflictDoUpdate({
             target: [rubricScores.roomId, rubricScores.roundNumber, rubricScores.criterion],
             set: { score, comment },
@@ -616,6 +666,7 @@ export class Room extends YServer {
     await this.withDb((db) =>
       db.insert(events).values({
         roomId: actor.roomId,
+        roundNumber: this.round,
         participantId: actor.participantId,
         type,
         payload,

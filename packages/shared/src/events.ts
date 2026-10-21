@@ -61,18 +61,62 @@ export const EVENT_PAYLOAD_SCHEMAS = {
   editor_locked: z.object({}),
   editor_unlocked: z.object({}),
   note_timestamp: z.object({ offsetMs: z.number().int().nonnegative(), text: z.string().max(200) }),
+  round_started: z.object({
+    roundNumber: z.number().int().min(1),
+    interviewerName: z.string(),
+    candidateName: z.string(),
+  }),
+  // Integrity signals: reported by each participant's own browser, shown to everyone.
+  paste: z.object({
+    chars: z.number().int().nonnegative().max(10_000_000),
+    preview: z.string().max(200),
+    target: z.enum(['code', 'notes']),
+  }),
+  large_insert: z.object({
+    chars: z.number().int().nonnegative().max(10_000_000),
+    target: z.enum(['code', 'notes']),
+  }),
+  tab_hidden: z.object({}),
+  tab_visible: z.object({ hiddenMs: z.number().int().nonnegative().max(86_400_000) }),
+  window_blur: z.object({}),
+  window_focus: z.object({ awayMs: z.number().int().nonnegative().max(86_400_000) }),
 } satisfies Partial<Record<EventType, z.ZodType>>;
 
+/** Signals the transparency feed shows. Signals, never verdicts. */
+export const INTEGRITY_EVENT_TYPES = [
+  'paste',
+  'large_insert',
+  'tab_hidden',
+  'tab_visible',
+  'window_blur',
+  'window_focus',
+] as const satisfies readonly EventType[];
+export type IntegrityEventType = (typeof INTEGRITY_EVENT_TYPES)[number];
+
+export function isIntegrityEvent(type: string): type is IntegrityEventType {
+  return (INTEGRITY_EVENT_TYPES as readonly string[]).includes(type);
+}
+
 /** Event types a client may send itself; everything else is produced by the server. */
-export const CLIENT_EVENT_TYPES = ['tab_changed', 'language_changed', 'note_timestamp'] as const;
+export const CLIENT_EVENT_TYPES = [
+  'tab_changed',
+  'language_changed',
+  'note_timestamp',
+  ...INTEGRITY_EVENT_TYPES,
+] as const;
+const clientEvent = <T extends keyof typeof EVENT_PAYLOAD_SCHEMAS>(type: T) =>
+  z.object({ type: z.literal(type), payload: EVENT_PAYLOAD_SCHEMAS[type] });
 export const clientEventSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('tab_changed'), payload: EVENT_PAYLOAD_SCHEMAS.tab_changed }),
-  z.object({
-    type: z.literal('language_changed'),
-    payload: EVENT_PAYLOAD_SCHEMAS.language_changed,
-  }),
+  clientEvent('tab_changed'),
+  clientEvent('language_changed'),
   // Only accepted on the interviewers' private document.
-  z.object({ type: z.literal('note_timestamp'), payload: EVENT_PAYLOAD_SCHEMAS.note_timestamp }),
+  clientEvent('note_timestamp'),
+  clientEvent('paste'),
+  clientEvent('large_insert'),
+  clientEvent('tab_hidden'),
+  clientEvent('tab_visible'),
+  clientEvent('window_blur'),
+  clientEvent('window_focus'),
 ]);
 export type ClientEvent = z.infer<typeof clientEventSchema>;
 

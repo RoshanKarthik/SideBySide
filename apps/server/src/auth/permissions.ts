@@ -4,13 +4,37 @@
  */
 import {
   isInterviewerRole,
+  type DocumentPart,
   type RoomRole,
   type RoomStatus,
   type Visibility,
 } from '@sidebyside/shared';
 
-/** The parts of a room's collaborative state, each its own Yjs document. */
-export type DocumentPart = 'shared' | 'private';
+export type { DocumentPart };
+
+/**
+ * The role someone acts in right now. Practice peers interview in one round and solve in the
+ * other, so every permission check uses this rather than the stored `peer` role: the peer
+ * interviewing this round is an interviewer, the other is a candidate.
+ */
+export function effectiveRole(
+  storedRole: RoomRole,
+  participantId: string,
+  roundInterviewerId: string | null | undefined,
+): RoomRole {
+  if (storedRole !== 'peer') return storedRole;
+  return participantId === roundInterviewerId ? 'interviewer' : 'candidate';
+}
+
+/** Practice peers can start the next round (swap roles) while the room is live. */
+export function canSwapRoles(storedRole: RoomRole, room: { status: RoomStatus; mode: string }) {
+  return storedRole === 'peer' && room.mode === 'practice' && room.status === 'live';
+}
+
+/** Practice peers rate each other once the session has ended. */
+export function canRate(storedRole: RoomRole, room: { status: RoomStatus; mode: string }) {
+  return storedRole === 'peer' && room.mode === 'practice' && room.status === 'ended';
+}
 
 export interface RoomAccessFacts {
   status: RoomStatus;
@@ -39,10 +63,16 @@ export function canUpdateRoomSettings(role: RoomRole): boolean {
   return role === 'owner';
 }
 
-export function canViewReplay(role: RoomRole, room: RoomAccessFacts): boolean {
+/** `storedRole` matters here: practice peers always see both rounds' replays. */
+export function canViewReplay(storedRole: RoomRole, room: RoomAccessFacts): boolean {
   if (room.status !== 'ended') return false;
-  if (isInterviewerRole(role)) return true;
-  return role === 'candidate' && room.shareReplayWithCandidate;
+  if (isInterviewerRole(storedRole) || storedRole === 'peer') return true;
+  return storedRole === 'candidate' && room.shareReplayWithCandidate;
+}
+
+/** The session summary page: interviewers, and practice peers (each sees only their own rubric). */
+export function canViewSummary(storedRole: RoomRole): boolean {
+  return isInterviewerRole(storedRole) || storedRole === 'peer';
 }
 
 export function canSeeEvent(role: RoomRole, visibility: Visibility): boolean {

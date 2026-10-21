@@ -27,4 +27,20 @@ export async function connectDb(connectionString: string): Promise<DbHandle> {
 }
 
 // Query helpers re-exported so every package uses this package's single drizzle-orm instance.
-export { and, asc, count, desc, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
+export {
+  and,
+  asc,
+  avg,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';

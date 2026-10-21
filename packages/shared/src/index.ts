@@ -5,3 +5,4 @@ export * from './languages';
 export * from './realtime';
 export * from './roles';
 export * from './questions';
+export * from './practice';

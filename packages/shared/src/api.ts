@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { DEFAULT_RETENTION_DAYS, LIMITS, RETENTION_DAYS } from './constants';
-import { runStatusSchema } from './events';
 import { langSchema } from './languages';
 import { roomModeSchema, roomRoleSchema, roomStatusSchema } from './roles';
 
@@ -57,6 +56,8 @@ export const roomSchema = z.object({
   createdAt: z.string(),
   startedAt: z.string().nullable(),
   endedAt: z.string().nullable(),
+  /** Practice rooms have two rounds with the roles swapped; interview rooms always have one. */
+  currentRound: z.number().int().min(1),
 });
 export type Room = z.infer<typeof roomSchema>;
 
@@ -94,18 +95,97 @@ export const joinRoomResponseSchema = z.object({
 });
 export type JoinRoomResponse = z.infer<typeof joinRoomResponseSchema>;
 
+export const REPLAY_MARKER_KINDS = [
+  'code_run',
+  'tests_run',
+  'question_shown',
+  'hint_revealed',
+  'paste',
+  'tab_hidden',
+  'window_blur',
+  'note_timestamp',
+] as const;
+export const replayMarkerKindSchema = z.enum(REPLAY_MARKER_KINDS);
+export type ReplayMarkerKind = z.infer<typeof replayMarkerKindSchema>;
+
 export const replayMarkerSchema = z.object({
   ts: z.number(),
-  kind: z.literal('code_run'),
-  status: runStatusSchema,
+  kind: replayMarkerKindSchema,
+  /** Colour hint: ok (green), error (red), info (accent), signal (amber). */
+  tone: z.enum(['ok', 'error', 'info', 'signal']),
   label: z.string(),
 });
 export type ReplayMarker = z.infer<typeof replayMarkerSchema>;
 
 export const replayManifestSchema = z.object({
   room: roomSchema,
+  round: z.number().int(),
+  rounds: z.number().int(),
   startTs: z.number(),
   endTs: z.number(),
   markers: z.array(replayMarkerSchema),
+  /** Display names by participant id, to label who made each change. */
+  people: z.record(z.string(), z.string()),
 });
 export type ReplayManifest = z.infer<typeof replayManifestSchema>;
+
+// ---------------------------------------------------------------------------
+// Session summary (the page an interviewer sees after a session)
+// ---------------------------------------------------------------------------
+
+export const sessionSummarySchema = z.object({
+  room: roomSchema,
+  myRole: roomRoleSchema,
+  durationMs: z.number().int().nonnegative(),
+  participants: z.array(
+    z.object({
+      id: z.string(),
+      displayName: z.string(),
+      role: roomRoleSchema,
+      joinedAt: z.string(),
+      isGuest: z.boolean(),
+    }),
+  ),
+  rounds: z.array(
+    z.object({
+      roundNumber: z.number().int(),
+      interviewer: z.string().nullable(),
+      candidate: z.string().nullable(),
+      /** Whether the caller interviewed in this round (rubric and private data are theirs). */
+      mine: z.boolean(),
+      questions: z.array(z.object({ questionId: z.string(), title: z.string(), ts: z.number() })),
+      hintsRevealed: z.number().int(),
+      runs: z.object({ total: z.number().int(), ok: z.number().int(), failed: z.number().int() }),
+      tests: z.array(
+        z.object({
+          ts: z.number(),
+          passed: z.number().int(),
+          total: z.number().int(),
+          language: langSchema,
+        }),
+      ),
+      /** Present only for rounds the caller interviewed. */
+      rubric: z
+        .array(
+          z.object({
+            criterion: z.string(),
+            score: z.number().int().nullable(),
+            comment: z.string(),
+          }),
+        )
+        .nullable(),
+      signals: z.object({
+        pastes: z.number().int(),
+        pastedChars: z.number().int(),
+        largeInserts: z.number().int(),
+        tabHidden: z.number().int(),
+        hiddenMs: z.number().int(),
+        windowBlur: z.number().int(),
+        awayMs: z.number().int(),
+      }),
+    }),
+  ),
+  canDelete: z.boolean(),
+  canViewReplay: z.boolean(),
+});
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;

@@ -13,9 +13,16 @@
     "run_worker_first": ["/api/*", "/collab/*", "/assets/runner.worker-*"],
   },
   "durable_objects": {
-    "bindings": [{ "name": "Room", "class_name": "Room" }],
+    "bindings": [
+      { "name": "Room", "class_name": "Room" },
+      // One global instance holds the practice matchmaking queue.
+      { "name": "Matchmaker", "class_name": "Matchmaker" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] },
+  ],
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",

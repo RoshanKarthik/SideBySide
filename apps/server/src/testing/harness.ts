@@ -2,7 +2,9 @@ import type { DbHandle } from '@sidebyside/db';
 import { createTestDb } from '@sidebyside/db/testing';
 import { expect, vi } from 'vitest';
 import { createApp } from '../app';
-import type { AppDeps, RoomRpc } from '../context';
+import type { AppDeps, MatchmakerRpc, RoomRpc } from '../context';
+import { MatchQueue } from '../practice/queue';
+import { createPracticeRoom } from '../practice/rooms';
 
 export const ORIGIN = 'http://localhost:5173';
 
@@ -28,13 +30,23 @@ export async function createHarness() {
   const handle: DbHandle = await createTestDb();
   const roomRpc = {
     end: vi.fn(async () => {}),
+    closeRound: vi.fn(async () => {}),
+    purge: vi.fn(async () => {}),
     getReplayLog: vi.fn(async () => new Uint8Array([1])),
     showQuestion: vi.fn(async () => {}),
     revealHint: vi.fn(async () => true),
   } satisfies RoomRpc;
+  // The real queue logic, creating rooms in the test database.
+  const queue = new MatchQueue((a, b, prefs) => createPracticeRoom(handle.db, a, b, prefs));
+  const matchmaker: MatchmakerRpc = {
+    enqueue: (user, prefs) => queue.enqueue(user, prefs),
+    status: async (userId) => queue.status(userId),
+    leave: async (userId) => queue.leave(userId),
+  };
   const deps: AppDeps = {
     openDb: async () => ({ db: handle.db, close: async () => {} }),
     room: async () => roomRpc,
+    matchmaker: async () => matchmaker,
   };
   const app = createApp(deps);
 
@@ -66,5 +78,14 @@ export async function createHarness() {
       .join('; ');
   };
 
-  return { app, call, json, signUp, db: handle.db, roomRpc, close: () => handle.close() };
+  return {
+    app,
+    call,
+    json,
+    signUp,
+    db: handle.db,
+    roomRpc,
+    queue,
+    close: () => handle.close(),
+  };
 }

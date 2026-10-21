@@ -3,12 +3,15 @@ import {
   eq,
   participants,
   rooms,
+  sessionRounds,
   type Database,
   type ParticipantRow,
   type RoomRow,
 } from '@sidebyside/db';
+import type { RoomRole } from '@sidebyside/shared';
 import type { Auth } from './auth';
 import { verifyGuestToken } from './guest-token';
+import { effectiveRole } from './permissions';
 
 export interface SessionUser {
   id: string;
@@ -34,6 +37,28 @@ export function readGuestToken(request: Request): string | null {
 export interface RoomMembership {
   room: RoomRow;
   participant: ParticipantRow;
+  /** The role to check permissions against (see `effectiveRole`). */
+  role: RoomRole;
+}
+
+/** Practice peers' role depends on who interviews in the room's current round. */
+async function withRole(
+  db: Database,
+  room: RoomRow,
+  participant: ParticipantRow,
+): Promise<RoomMembership> {
+  if (participant.role !== 'peer') return { room, participant, role: participant.role };
+  const [round] = await db
+    .select({ interviewer: sessionRounds.interviewerParticipantId })
+    .from(sessionRounds)
+    .where(
+      and(eq(sessionRounds.roomId, room.id), eq(sessionRounds.roundNumber, room.currentRound)),
+    );
+  return {
+    room,
+    participant,
+    role: effectiveRole(participant.role, participant.id, round?.interviewer),
+  };
 }
 
 /**
@@ -55,7 +80,7 @@ export async function resolveMembership(
         .select()
         .from(participants)
         .where(and(eq(participants.id, claims.participantId), eq(participants.roomId, room.id)));
-      if (participant) return { room, participant };
+      if (participant) return withRole(db, room, participant);
     }
   }
   const user = await getSessionUser(auth, request.headers);
@@ -64,7 +89,7 @@ export async function resolveMembership(
     .select()
     .from(participants)
     .where(and(eq(participants.roomId, room.id), eq(participants.userId, user.id)));
-  return participant ? { room, participant } : null;
+  return participant ? withRole(db, room, participant) : null;
 }
 
 export async function findRoomById(db: Database, id: string): Promise<RoomRow | null> {

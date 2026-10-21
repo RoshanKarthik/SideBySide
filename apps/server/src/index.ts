@@ -1,4 +1,5 @@
 import { connectDb } from '@sidebyside/db';
+import { roomDocumentName } from '@sidebyside/shared';
 import { getServerByName, routePartykitRequest, type Server } from 'partyserver';
 import { createApp } from './app';
 import { authorizeConnection } from './collab/connect';
@@ -6,14 +7,16 @@ import type { Room } from './collab/room';
 import type { AppDeps } from './context';
 
 export { Room } from './collab/room';
+export { Matchmaker } from './practice/matchmaker';
 
 const deps: AppDeps = {
   openDb: (env) => connectDb(env.HYPERDRIVE.connectionString),
-  room: async (env, roomId, part = 'shared') =>
+  room: async (env, roomId, part = 'shared', round = 1) =>
     (await getServerByName(
       env.Room as unknown as DurableObjectNamespace<Server>,
-      `${roomId}--${part}`,
+      roomDocumentName(roomId, part, round),
     )) as unknown as DurableObjectStub<Room>,
+  matchmaker: async (env) => env.Matchmaker.get(env.Matchmaker.idFromName('global')),
 };
 
 const api = createApp(deps);

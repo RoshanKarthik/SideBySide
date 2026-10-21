@@ -17,6 +17,7 @@ export function toRoomDto(row: RoomRow): Room {
     createdAt: row.createdAt.toISOString(),
     startedAt: iso(row.startedAt),
     endedAt: iso(row.endedAt),
+    currentRound: row.currentRound,
   };
 }
 

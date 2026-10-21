@@ -12,13 +12,11 @@ import {
 import {
   and,
   asc,
-  codeRuns,
   count,
   desc,
   eq,
   events,
   gte,
-  inArray,
   participants,
   rooms,
   sessionRounds,
@@ -27,11 +25,13 @@ import {
 import { Hono, type Context } from 'hono';
 import { getSessionUser, findRoomById, findRoomBySlug, resolveMembership } from '../auth/identity';
 import { signGuestToken } from '../auth/guest-token';
-import { canEndSession, canSeeEvent, canViewReplay } from '../auth/permissions';
+import { canEndSession, canViewReplay } from '../auth/permissions';
 import type { AppDeps, AppEnv } from '../context';
 import { HttpError, badRequest, conflict, forbidden, notFound, unauthorized } from '../lib/errors';
 import { parseBody } from '../lib/validate';
 import { randomSlug } from '../lib/slug';
+import { buildMarkers } from '../lib/markers';
+import { loadRounds, parseRound, seesPrivateDataOf } from '../lib/rounds';
 import { roomLink, toRoomDto } from '../lib/serialize';
 
 const ROOMS_PER_DAY = 20;
@@ -143,13 +143,14 @@ export function roomRoutes(deps: AppDeps) {
       room,
     );
     if (!membership) throw notFound('Not a participant');
-    const { participant } = membership;
+    const { participant, role } = membership;
     const body: JoinRoomResponse = {
       room: toRoomDto(room),
       participant: {
         id: participant.id,
         displayName: participant.displayName,
-        role: participant.role,
+        // Practice peers get their role for the current round.
+        role,
       },
       collabToken: null,
     };
@@ -173,6 +174,9 @@ export function roomRoutes(deps: AppDeps) {
     const user = existing ? null : await getSessionUser(c.var.auth, c.req.raw.headers);
 
     let participant = existing?.participant;
+    if (!participant && room.mode === 'practice') {
+      throw forbidden('Practice rooms are for the two matched peers');
+    }
     if (!participant) {
       const displayName = input.displayName ?? user?.name;
       if (!displayName) throw badRequest('Enter your name to join');
@@ -218,7 +222,7 @@ export function roomRoutes(deps: AppDeps) {
       participant: {
         id: participant.id,
         displayName: participant.displayName,
-        role: participant.role,
+        role: existing?.role ?? participant.role,
       },
       collabToken,
     };
@@ -226,9 +230,8 @@ export function roomRoutes(deps: AppDeps) {
   });
 
   app.post('/rooms/:id/end', async (c) => {
-    const { room, participant } = await requireMembership(c, c.req.param('id'));
-    if (!canEndSession(participant.role))
-      throw forbidden('Only the interviewer can end the session');
+    const { room, participant, role } = await requireMembership(c, c.req.param('id'));
+    if (!canEndSession(role)) throw forbidden('Only the interviewer can end the session');
     if (room.status !== 'ended') {
       const endedAt = new Date();
       const deleteAfter = new Date(endedAt.getTime() + room.retentionDays * 24 * 60 * 60 * 1000);
@@ -237,9 +240,18 @@ export function roomRoutes(deps: AppDeps) {
           .update(rooms)
           .set({ status: 'ended', endedAt, deleteAfter, startedAt: room.startedAt ?? endedAt })
           .where(eq(rooms.id, room.id));
-        await tx.update(sessionRounds).set({ endedAt }).where(eq(sessionRounds.roomId, room.id));
+        await tx
+          .update(sessionRounds)
+          .set({ endedAt })
+          .where(
+            and(
+              eq(sessionRounds.roomId, room.id),
+              eq(sessionRounds.roundNumber, room.currentRound),
+            ),
+          );
         await tx.insert(events).values({
           roomId: room.id,
+          roundNumber: room.currentRound,
           participantId: participant.id,
           type: 'session_ended',
           payload: {},
@@ -248,8 +260,8 @@ export function roomRoutes(deps: AppDeps) {
         });
       });
       await Promise.all([
-        (await deps.room(c.env, room.id, 'shared')).end(),
-        (await deps.room(c.env, room.id, 'private')).end(),
+        (await deps.room(c.env, room.id, 'shared', room.currentRound)).end(),
+        (await deps.room(c.env, room.id, 'private', room.currentRound)).end(),
       ]);
     }
     const updated = await findRoomById(c.var.db, room.id);
@@ -257,15 +269,26 @@ export function roomRoutes(deps: AppDeps) {
   });
 
   app.get('/rooms/:id/events', async (c) => {
-    const { room, participant } = await requireMembership(c, c.req.param('id'));
-    const rows = await c.var.db
-      .select()
-      .from(events)
-      .where(eq(events.roomId, room.id))
-      .orderBy(asc(events.serverTs), asc(events.id))
-      .limit(5000);
+    const membership = await requireMembership(c, c.req.param('id'));
+    const { room } = membership;
+    const [rows, rounds] = await Promise.all([
+      c.var.db
+        .select()
+        .from(events)
+        .where(eq(events.roomId, room.id))
+        .orderBy(asc(events.serverTs), asc(events.id))
+        .limit(5000),
+      loadRounds(c.var.db, room.id),
+    ]);
     const body: RoomEvent[] = rows
-      .filter((e) => canSeeEvent(participant.role, e.visibility))
+      .filter(
+        (e) =>
+          e.visibility === 'all' ||
+          seesPrivateDataOf(
+            membership,
+            rounds.find((r) => r.roundNumber === e.roundNumber),
+          ),
+      )
       .map((e) => ({
         id: String(e.id),
         type: e.type as RoomEvent['type'],
@@ -276,32 +299,43 @@ export function roomRoutes(deps: AppDeps) {
     return c.json(body);
   });
 
+  /** `?round=` picks a practice round; interview rooms have one. */
   app.get('/rooms/:id/replay/manifest', async (c) => {
-    const { room, participant } = await requireMembership(c, c.req.param('id'));
+    const membership = await requireMembership(c, c.req.param('id'));
+    const { room, participant } = membership;
     if (!canViewReplay(participant.role, room)) throw forbidden('Replay is not available to you');
-    const runs = await c.var.db
-      .select({
-        ts: codeRuns.serverTs,
-        status: codeRuns.status,
-        language: codeRuns.language,
-        name: participants.displayName,
-      })
-      .from(codeRuns)
-      .leftJoin(participants, eq(participants.id, codeRuns.participantId))
-      .where(and(eq(codeRuns.roomId, room.id), inArray(codeRuns.kind, ['run'])))
-      .orderBy(asc(codeRuns.serverTs));
-    const startTs = (room.startedAt ?? room.createdAt).getTime();
-    const endTs = (room.endedAt ?? new Date()).getTime();
+    const rounds = await loadRounds(c.var.db, room.id);
+    const roundNumber = parseRound(c.req.query('round'), room.currentRound);
+    const round = rounds.find((r) => r.roundNumber === roundNumber);
+    const [rows, people] = await Promise.all([
+      c.var.db
+        .select()
+        .from(events)
+        .where(and(eq(events.roomId, room.id), eq(events.roundNumber, roundNumber)))
+        .orderBy(asc(events.serverTs), asc(events.id))
+        .limit(5000),
+      c.var.db
+        .select({ id: participants.id, name: participants.displayName })
+        .from(participants)
+        .where(eq(participants.roomId, room.id)),
+    ]);
+    const names = Object.fromEntries(people.map((p) => [p.id, p.name]));
+    const roomStart = (room.startedAt ?? room.createdAt).getTime();
+    const startTs =
+      (round?.startedAt ?? (roundNumber === 1 ? null : round?.createdAt))?.getTime() ?? roomStart;
+    const endTs = (round?.endedAt ?? room.endedAt ?? new Date()).getTime();
     const body: ReplayManifest = {
       room: toRoomDto(room),
+      round: roundNumber,
+      rounds: room.currentRound,
       startTs,
       endTs: Math.max(endTs, startTs),
-      markers: runs.map((r) => ({
-        ts: r.ts.getTime(),
-        kind: 'code_run',
-        status: r.status,
-        label: `${r.name ?? 'Someone'} ran ${r.language} (${r.status})`,
-      })),
+      markers: buildMarkers(
+        rows.map((e) => ({ ...e, serverTs: e.serverTs.getTime() })),
+        names,
+        seesPrivateDataOf(membership, round),
+      ),
+      people: names,
     };
     return c.json(body);
   });
@@ -309,7 +343,8 @@ export function roomRoutes(deps: AppDeps) {
   app.get('/rooms/:id/replay/log', async (c) => {
     const { room, participant } = await requireMembership(c, c.req.param('id'));
     if (!canViewReplay(participant.role, room)) throw forbidden('Replay is not available to you');
-    const log = await (await deps.room(c.env, room.id)).getReplayLog();
+    const round = parseRound(c.req.query('round'), room.currentRound);
+    const log = await (await deps.room(c.env, room.id, 'shared', round)).getReplayLog();
     return c.body(log as Uint8Array<ArrayBuffer>, 200, {
       'content-type': 'application/octet-stream',
       'cache-control': 'private, max-age=300',

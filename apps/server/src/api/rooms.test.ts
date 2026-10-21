@@ -28,10 +28,15 @@ beforeAll(async () => {
     openDb: async () => ({ db: handle.db, close: async () => {} }),
     room: async () => ({
       end,
+      closeRound: async () => {},
+      purge: async () => {},
       getReplayLog: async () => new Uint8Array([1]),
       showQuestion: async () => {},
       revealHint: async () => true,
     }),
+    matchmaker: async () => {
+      throw new Error('Not used in these tests');
+    },
   };
   app = createApp(deps);
 });

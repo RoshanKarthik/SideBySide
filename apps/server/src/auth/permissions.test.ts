@@ -5,9 +5,12 @@ import {
   canConnectToDocument,
   canEndSession,
   canJoinLive,
+  canRate,
   canRecordRun,
   canSeeEvent,
+  canSwapRoles,
   canViewReplay,
+  effectiveRole,
 } from './permissions';
 
 describe('permissions', () => {
@@ -36,6 +39,24 @@ describe('permissions', () => {
     expect(canSeeEvent('candidate', 'all')).toBe(true);
     expect(canSeeEvent('candidate', 'interviewers')).toBe(false);
     expect(canSeeEvent('owner', 'interviewers')).toBe(true);
+  });
+
+  it('gives practice peers the role of their side in the current round', () => {
+    expect(effectiveRole('peer', 'a', 'a')).toBe('interviewer');
+    expect(effectiveRole('peer', 'b', 'a')).toBe('candidate');
+    expect(effectiveRole('peer', 'b', null)).toBe('candidate');
+    expect(effectiveRole('owner', 'x', 'y')).toBe('owner');
+    // So the peer solving this round is kept out of the private document.
+    expect(canConnectToDocument(effectiveRole('peer', 'b', 'a'), 'private')).toBe(false);
+  });
+
+  it('lets practice peers swap roles while live and rate once ended', () => {
+    const live = { status: 'live' as const, mode: 'practice' };
+    expect(canSwapRoles('peer', live)).toBe(true);
+    expect(canSwapRoles('owner', live)).toBe(false);
+    expect(canSwapRoles('peer', { ...live, mode: 'interview' })).toBe(false);
+    expect(canRate('peer', live)).toBe(false);
+    expect(canRate('peer', { ...live, status: 'ended' })).toBe(true);
   });
 
   it('closes ended rooms to joins and runs', () => {
@@ -71,8 +92,14 @@ describe('guest tokens', () => {
 describe('document names', () => {
   it('accepts room documents and rejects anything else', () => {
     const id = '00000000-0000-4000-8000-000000000001';
-    expect(parseDocumentName(`${id}--shared`)).toEqual({ roomId: id, part: 'shared' });
-    expect(parseDocumentName(`${id}--private`)).toEqual({ roomId: id, part: 'private' });
+    expect(parseDocumentName(`${id}--shared`)).toEqual({ roomId: id, part: 'shared', round: 1 });
+    expect(parseDocumentName(`${id}--private`)).toEqual({ roomId: id, part: 'private', round: 1 });
+    expect(parseDocumentName(`${id}--private-r2`)).toEqual({
+      roomId: id,
+      part: 'private',
+      round: 2,
+    });
+    expect(parseDocumentName(`${id}--shared-r1`)).toBeNull();
     expect(parseDocumentName(`${id}--other`)).toBeNull();
     expect(parseDocumentName('nope--shared')).toBeNull();
     expect(parseDocumentName(`${id}--shared--x`)).toBeNull();

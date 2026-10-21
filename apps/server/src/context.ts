@@ -1,5 +1,5 @@
 import type { Database, DbHandle } from '@sidebyside/db';
-import type { Lang } from '@sidebyside/shared';
+import type { Lang, PracticePrefs, QueueStatus } from '@sidebyside/shared';
 import type { SharedProblem } from '@sidebyside/shared/doc';
 import type { Auth } from './auth/auth';
 import type { DocumentPart } from './auth/permissions';
@@ -7,7 +7,8 @@ import type { DocumentPart } from './auth/permissions';
 /** What routes need from the outside world; tests swap these for in-memory versions. */
 export interface AppDeps {
   openDb(env: Env): Promise<DbHandle>;
-  room(env: Env, roomId: string, part?: DocumentPart): Promise<RoomRpc>;
+  room(env: Env, roomId: string, part?: DocumentPart, round?: number): Promise<RoomRpc>;
+  matchmaker(env: Env): Promise<MatchmakerRpc>;
 }
 
 export interface Actor {
@@ -18,6 +19,8 @@ export interface Actor {
 /** The RPC surface of a room's Durable Object. */
 export interface RoomRpc {
   end(): Promise<void>;
+  closeRound(nextRound: number): Promise<void>;
+  purge(): Promise<void>;
   getReplayLog(): Promise<Uint8Array>;
   showQuestion(
     actor: Actor,
@@ -32,4 +35,11 @@ export interface AppEnv {
     db: Database;
     auth: Auth;
   };
+}
+
+/** The RPC surface of the practice Matchmaker Durable Object. */
+export interface MatchmakerRpc {
+  enqueue(user: { id: string; name: string }, prefs: PracticePrefs): Promise<QueueStatus>;
+  status(userId: string): Promise<QueueStatus>;
+  leave(userId: string): Promise<void>;
 }

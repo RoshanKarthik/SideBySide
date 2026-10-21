@@ -1,18 +1,15 @@
 import { and, connectDb, eq, rooms, type DbHandle } from '@sidebyside/db';
+import { parseRoomDocumentName } from '@sidebyside/shared';
 import type { Lobby } from 'partyserver';
 import { createAuth } from '../auth/auth';
 import { findRoomById, isUuid, resolveMembership } from '../auth/identity';
-import { canConnectToDocument, canJoinLive, type DocumentPart } from '../auth/permissions';
+import { canConnectToDocument, canJoinLive } from '../auth/permissions';
 import { CONNECTION_HEADER, type ConnectionInfo } from './protocol';
 
-const PARTS: readonly DocumentPart[] = ['shared', 'private'];
-
-/** Durable Object names look like `<roomId>--<part>`. */
-export function parseDocumentName(name: string): { roomId: string; part: DocumentPart } | null {
-  const [roomId, part, ...rest] = name.split('--');
-  if (!roomId || !part || rest.length || !isUuid(roomId)) return null;
-  if (!(PARTS as readonly string[]).includes(part)) return null;
-  return { roomId, part: part as DocumentPart };
+/** Durable Object names look like `<roomId>--<part>`, plus `-r<n>` for later practice rounds. */
+export function parseDocumentName(name: string) {
+  const parsed = parseRoomDocumentName(name);
+  return parsed && isUuid(parsed.roomId) ? parsed : null;
 }
 
 const deny = (status: number, message: string) => new Response(message, { status });
@@ -45,8 +42,10 @@ export async function authorizeConnection(
       room,
     );
     if (!membership) return deny(401, 'Not a participant');
-    const { participant } = membership;
-    if (!canConnectToDocument(participant.role, target.part)) return deny(403, 'Forbidden');
+    const { participant, role } = membership;
+    // Only the current round is live; earlier rounds are recordings.
+    if (target.round !== room.currentRound) return deny(410, 'Round over');
+    if (!canConnectToDocument(role, target.part)) return deny(403, 'Forbidden');
 
     if (room.status === 'scheduled') {
       await handle.db
@@ -58,9 +57,10 @@ export async function authorizeConnection(
     const info: ConnectionInfo = {
       roomId: room.id,
       participantId: participant.id,
-      role: participant.role,
+      role,
       displayName: participant.displayName,
       defaultLanguage: room.defaultLanguage,
+      round: target.round,
     };
     const forwarded = new Request(request);
     forwarded.headers.set(CONNECTION_HEADER, JSON.stringify(info));

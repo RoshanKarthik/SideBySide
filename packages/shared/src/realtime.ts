@@ -60,6 +60,8 @@ export const serverMessageSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('event'), event: roomEventSchema }),
   z.object({ kind: z.literal('run_result'), run: sharedRunSchema }),
   z.object({ kind: z.literal('session_ended') }),
+  /** Practice: the peers swapped roles; reconnect to the next round's documents. */
+  z.object({ kind: z.literal('round_changed'), round: z.number().int() }),
   z.object({ kind: z.literal('lock_state'), locked: z.boolean() }),
   /** Sent to one interviewer: run the tests for this request in your browser. */
   z.object({
@@ -94,4 +96,28 @@ export interface BoardPointer {
   y: number;
   tool: 'pointer' | 'laser';
   button: 'up' | 'down';
+}
+
+export type DocumentPart = 'shared' | 'private';
+
+/**
+ * Durable Object name for one part of one round: `<roomId>--shared` and `<roomId>--private` for
+ * round 1 (and every interview room), `<roomId>--shared-r2` and so on for later practice
+ * rounds. Each round is its own recording, so a peer who interviews in round 2 can't open the
+ * private notes their partner wrote about them in round 1.
+ */
+export function roomDocumentName(roomId: string, part: DocumentPart, round = 1): string {
+  return round <= 1 ? `${roomId}--${part}` : `${roomId}--${part}-r${round}`;
+}
+
+export function parseRoomDocumentName(
+  name: string,
+): { roomId: string; part: DocumentPart; round: number } | null {
+  const match = /^([0-9a-f-]{36})--(shared|private)(?:-r([2-9]))?$/i.exec(name);
+  if (!match) return null;
+  return {
+    roomId: match[1]!,
+    part: match[2] as DocumentPart,
+    round: match[3] ? Number(match[3]) : 1,
+  };
 }

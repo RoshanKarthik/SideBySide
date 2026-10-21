@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { meRoutes } from './api/me';
+import { practiceRoutes } from './api/practice';
 import { questionRoutes } from './api/questions';
 import { roomToolRoutes } from './api/room-tools';
 import { roomRoutes } from './api/rooms';
+import { sessionRoutes } from './api/sessions';
 import { allowedOrigins, createAuth } from './auth/auth';
 import type { AppDeps, AppEnv } from './context';
 import { HttpError } from './lib/errors';
@@ -56,10 +58,12 @@ export function createApp(deps: AppDeps) {
 
   app.on(['GET', 'POST'], '/auth/*', (c) => c.var.auth.handler(c.req.raw));
 
-  app.route('/', meRoutes());
+  app.route('/', meRoutes(deps));
   app.route('/', roomRoutes(deps));
   app.route('/', roomToolRoutes(deps));
+  app.route('/', sessionRoutes(deps));
   app.route('/', questionRoutes());
+  app.route('/', practiceRoutes(deps));
 
   return app;
 }

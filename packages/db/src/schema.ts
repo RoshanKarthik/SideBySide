@@ -134,6 +134,8 @@ export const rooms = pgTable(
     deleteAfter: timestamp('delete_after', { withTimezone: true }),
     /** Secret in the co-interviewer invite link; rotate it to revoke old links. */
     coInterviewerToken: text('co_interviewer_token'),
+    /** Practice rooms move to round 2 when the peers swap roles. */
+    currentRound: integer('current_round').notNull().default(1),
     createdAt: createdAt(),
   },
   (t) => [
@@ -315,6 +317,35 @@ export const rubricScores = pgTable(
   (t) => [uniqueIndex('rubric_scores_room_criterion_idx').on(t.roomId, t.roundNumber, t.criterion)],
 );
 
+// ---------------------------------------------------------------------------
+// Practice mode (the matchmaking queue itself lives in the Matchmaker Durable Object)
+// ---------------------------------------------------------------------------
+
+export const practiceRatings = pgTable(
+  'practice_ratings',
+  {
+    id: id(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    fromUserId: uuid('from_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    toUserId: uuid('to_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    problemSolving: integer('problem_solving').notNull(),
+    communication: integer('communication').notNull(),
+    interviewing: integer('interviewing').notNull(),
+    comment: text('comment').notNull().default(''),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('practice_ratings_room_from_idx').on(t.roomId, t.fromUserId),
+    index('practice_ratings_to_idx').on(t.toUserId),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type RoomRow = typeof rooms.$inferSelect;
 export type ParticipantRow = typeof participants.$inferSelect;
@@ -322,3 +353,5 @@ export type EventRow = typeof events.$inferSelect;
 export type CodeRunRow = typeof codeRuns.$inferSelect;
 export type QuestionRow = typeof questions.$inferSelect;
 export type TestCaseRow = typeof testCases.$inferSelect;
+export type SessionRoundRow = typeof sessionRounds.$inferSelect;
+export type PracticeRatingRow = typeof practiceRatings.$inferSelect;

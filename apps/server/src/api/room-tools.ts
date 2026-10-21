@@ -42,7 +42,7 @@ async function requireInterviewer(c: Context<AppEnv>) {
     room,
   );
   if (!membership) throw notFound('Room not found');
-  if (!canManageInterview(membership.participant.role)) {
+  if (!canManageInterview(membership.role)) {
     throw forbidden('Only interviewers can do that');
   }
   return membership;
@@ -107,7 +107,7 @@ export function roomToolRoutes(deps: AppDeps) {
       if (code) starterCode[lang] = code;
     }
     await (
-      await deps.room(c.env, room.id)
+      await deps.room(c.env, room.id, 'shared', room.currentRound)
     ).showQuestion(
       { roomId: room.id, participantId: participant.id },
       {
@@ -132,7 +132,7 @@ export function roomToolRoutes(deps: AppDeps) {
     const text = Number.isInteger(index) ? q.hints[index] : undefined;
     if (text === undefined) throw notFound('Hint not found');
     const ok = await (
-      await deps.room(c.env, room.id)
+      await deps.room(c.env, room.id, 'shared', room.currentRound)
     ).revealHint({ roomId: room.id, participantId: participant.id }, q.id, index, text);
     if (!ok) throw conflict('Show the question to the candidate first', 'not_active');
     return c.json({ ok: true });
@@ -140,8 +140,8 @@ export function roomToolRoutes(deps: AppDeps) {
 
   /** The owner's co-interviewer invite link (created on first request). */
   app.get('/rooms/:id/invite', async (c) => {
-    const { room, participant } = await requireInterviewer(c);
-    if (!canInviteInterviewers(participant.role)) throw forbidden('Only the room owner can invite');
+    const { room, role } = await requireInterviewer(c);
+    if (!canInviteInterviewers(role)) throw forbidden('Only the room owner can invite');
     let token = room.coInterviewerToken;
     if (!token) {
       token = randomSlug(24);
@@ -163,6 +163,7 @@ export function roomToolRoutes(deps: AppDeps) {
       throw badRequest('This invite link is not valid', 'bad_invite');
     }
     if (room.status === 'ended') throw conflict('This session has ended', 'room_ended');
+    if (room.mode === 'practice') throw forbidden('Practice rooms are for the two matched peers');
 
     const [existing] = await c.var.db
       .select()
