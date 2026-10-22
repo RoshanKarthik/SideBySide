@@ -12,12 +12,16 @@ const monacoRoot = packageRoot('monaco-editor');
 const pyodideRoot = packageRoot('pyodide');
 const excalidrawRoot = packageRoot('@excalidraw/excalidraw');
 
+// The copy plugins below write into public/ from `configResolved`, not `buildStart`: the dev
+// server lists public/ once, right after the config resolves, and files added later are served
+// as index.html until it restarts.
+
 /** Serves Pyodide (Python in WebAssembly) from our own origin instead of a third-party CDN. */
 function copyPyodide(): Plugin {
   const files = ['pyodide.asm.mjs', 'pyodide.asm.wasm', 'python_stdlib.zip', 'pyodide-lock.json'];
   return {
     name: 'copy-pyodide',
-    buildStart() {
+    configResolved() {
       const out = path.join(here, 'public', 'pyodide');
       fs.mkdirSync(out, { recursive: true });
       for (const file of files) {
@@ -35,7 +39,7 @@ function copyPyodide(): Plugin {
 function copyExcalidrawFonts(): Plugin {
   return {
     name: 'copy-excalidraw-fonts',
-    buildStart() {
+    configResolved() {
       const from = path.join(excalidrawRoot, 'dist', 'prod', 'fonts');
       const to = path.join(here, 'public', 'excalidraw', 'fonts');
       const marker = path.join(to, '.version');
