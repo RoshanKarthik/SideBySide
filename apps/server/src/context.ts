@@ -27,6 +27,8 @@ export interface RoomRpc {
     input: { problem: SharedProblem; starterCode: Partial<Record<Lang, string>> },
   ): Promise<void>;
   revealHint(actor: Actor, questionId: string, index: number, text: string): Promise<boolean>;
+  /** Writes the round's AI reports in the background (shared document only). */
+  generateReports(): Promise<void>;
 }
 
 export interface AppEnv {

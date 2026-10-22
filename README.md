@@ -30,6 +30,11 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 - **Retention:** each room is deleted for good once its retention period (7, 30 or 90 days
   after the session ends) is over. A daily Cron Trigger purges the room's Durable Object
   documents, then its Postgres rows.
+- **AI post-interview reports** (Cloudflare Workers AI, free tier): when a session ends, a draft
+  report for the hiring team (approach, correctness, complexity, code quality, hints, key
+  moments, neutral activity summary, suggested rubric scores, debrief questions) and a feedback
+  report for the candidate. The candidate sees theirs only when the interviewer shared it, and
+  interviewers can regenerate either.
 - **Practice with a peer:** matchmaking by topic, difficulty and language, two rounds with a
   role swap, and ratings afterwards.
 - Dashboard with a candidates table (score, duration, status), live and upcoming rooms, stats
@@ -205,10 +210,21 @@ each step. The tests are not part of `pnpm test`.
    Repeat for `GUEST_TOKEN_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`
    and `GITHUB_CLIENT_SECRET`.
 
-5. **App URL.** Set `PUBLIC_APP_URL` in `wrangler.jsonc` to the Worker's URL (for example
+5. **AI reports (optional).** In the Cloudflare dashboard, create an API token with the
+   **Workers AI: Read** permission and note your account id. From `apps/server`:
+
+   ```bash
+   npx wrangler secret put CLOUDFLARE_ACCOUNT_ID
+   npx wrangler secret put CLOUDFLARE_AI_TOKEN
+   ```
+
+   Then set `AI_SUMMARY_PROVIDER` to `"workers-ai"` in `wrangler.jsonc`. Leave it `"off"` to
+   hide the feature. (`"sample"` shows fixed sample reports and is for local development only.)
+
+6. **App URL.** Set `PUBLIC_APP_URL` in `wrangler.jsonc` to the Worker's URL (for example
    `https://sidebyside.<account>.workers.dev`). Keep `ALLOW_DEV_LOGIN` set to `"false"`.
 
-6. **Deploy:**
+7. **Deploy:**
 
    ```bash
    pnpm deploy
@@ -239,6 +255,10 @@ each step. The tests are not part of `pnpm test`.
   removed before the code starts. In production the worker script is also served with a
   Content-Security-Policy that only allows loading Pyodide from the app's own origin.
 - IP addresses are not stored.
+- AI reports: the candidate's brief never contains private notes or the rubric; the
+  interviewer report is only returned to whoever interviewed that round, and the candidate
+  report only to its candidate when sharing is on. Model output is validated against a schema
+  before it is stored.
 - Video calls are peer to peer: the room only relays the connection setup between call
   participants (a tab's call id can't be taken over by another connection), and audio and video
   never pass through or get stored by the server.
@@ -260,6 +280,9 @@ each step. The tests are not part of `pnpm test`.
 - Video calls use public STUN servers only. Most networks connect directly, but some strict
   corporate networks need a TURN relay (for example Cloudflare's), which isn't set up yet. Calls
   are a mesh, so they suit interviews of two to four people, not large meetings.
+- AI reports use the Workers AI free allocation (about 10,000 neurons a day, roughly a dozen
+  sessions' reports). Beyond that, reports fail with a quota message until the next day and can
+  be regenerated then.
 - Sign-in by email link isn't available (it needs an email sender and a domain).
 - Retention cleanup runs once a day (03:30 UTC) and deletes at most 100 rooms per run, so a
   room can outlive its `delete_after` date by up to a day, longer if there is a backlog. A room

@@ -9,3 +9,9 @@ GITHUB_CLIENT_SECRET=
 ALLOW_DEV_LOGIN=true
 # Extra local hostnames (separate cookies) for testing a guest join next to a signed-in tab.
 TRUSTED_ORIGINS=http://127.0.0.1:5173,http://guest.localhost:5173
+# AI post-interview reports. "sample" shows fixed sample reports for trying the pages locally;
+# "workers-ai" calls Cloudflare Workers AI (free tier) with an account id and an API token
+# that has the "Workers AI: Read" permission.
+AI_SUMMARY_PROVIDER=sample
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_AI_TOKEN=

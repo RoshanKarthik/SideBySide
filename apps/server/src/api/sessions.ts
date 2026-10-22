@@ -29,6 +29,7 @@ import { conflict, forbidden, notFound } from '../lib/errors';
 import { loadRounds, seesPrivateDataOf } from '../lib/rounds';
 import { toRoomDto } from '../lib/serialize';
 import { parseBody } from '../lib/validate';
+import { queueReports } from './reports';
 
 async function requireMembership(c: Context<AppEnv>) {
   const room = await findRoomById(c.var.db, c.req.param('id') ?? '');
@@ -227,6 +228,7 @@ export function sessionRoutes(deps: AppDeps) {
           next.roundNumber,
         ),
       ]);
+      await queueReports(deps, c.env, c.var.db, room.id, room.currentRound);
     }
     const updated = await findRoomById(c.var.db, room.id);
     return c.json({ room: toRoomDto(updated ?? room) });

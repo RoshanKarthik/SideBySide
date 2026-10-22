@@ -157,3 +157,45 @@ export function showQuestionInDoc(
     meta.set('loadedStarters', { ...loaded, ...nextLoaded });
   });
 }
+
+const BLOCKS = new Set([
+  'paragraph',
+  'heading',
+  'codeBlock',
+  'blockquote',
+  'listItem',
+  'taskItem',
+  'horizontalRule',
+]);
+
+/**
+ * Plain text of a notes document (TipTap in Yjs): one line per block, list items as "- " and
+ * task items as "- [x] " / "- [ ] ". Used to hand the notes to the report writer.
+ */
+export function notesToText(fragment: Y.XmlFragment): string {
+  const walk = (node: Y.XmlElement | Y.XmlText | Y.XmlHook): string => {
+    if (node instanceof Y.XmlText) {
+      return node
+        .toDelta()
+        .map((op: { insert?: unknown }) => (typeof op.insert === 'string' ? op.insert : ''))
+        .join('');
+    }
+    if (!(node instanceof Y.XmlElement)) return '';
+    const inner = node
+      .toArray()
+      .map((child) => walk(child as Y.XmlElement | Y.XmlText))
+      .join('');
+    const name = node.nodeName;
+    if (name === 'hardBreak') return '\n';
+    if (name === 'listItem') return `- ${inner.trim()}\n`;
+    if (name === 'taskItem')
+      return `- [${node.getAttribute('checked') ? 'x' : ' '}] ${inner.trim()}\n`;
+    return BLOCKS.has(name) ? `${inner}\n` : inner;
+  };
+  return fragment
+    .toArray()
+    .map((child) => walk(child as Y.XmlElement | Y.XmlText))
+    .join('')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}

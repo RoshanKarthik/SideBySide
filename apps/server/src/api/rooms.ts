@@ -39,6 +39,7 @@ import { randomSlug } from '../lib/slug';
 import { buildMarkers } from '../lib/markers';
 import { loadRounds, parseRound, seesPrivateDataOf } from '../lib/rounds';
 import { roomBrand, roomLink, toBrand, toRoomDto } from '../lib/serialize';
+import { queueReports } from './reports';
 
 const ROOMS_PER_DAY = 20;
 
@@ -335,6 +336,8 @@ export function roomRoutes(deps: AppDeps) {
         (await deps.room(c.env, room.id, 'shared', room.currentRound)).end(),
         (await deps.room(c.env, room.id, 'private', room.currentRound)).end(),
       ]);
+      // Ending closed both documents (and saved the rubric); the AI reports can be written.
+      await queueReports(deps, c.env, c.var.db, room.id, room.currentRound);
     }
     const updated = await findRoomById(c.var.db, room.id);
     return c.json({ room: toRoomDto(updated ?? room) });

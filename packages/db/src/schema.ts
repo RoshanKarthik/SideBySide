@@ -1,6 +1,8 @@
 import {
   DIFFICULTIES,
   LANGUAGES,
+  REPORT_KINDS,
+  REPORT_STATUSES,
   ROOM_MODES,
   ROOM_ROLES,
   ROOM_STATUSES,
@@ -41,6 +43,8 @@ export const visibilityEnum = pgEnum('visibility', VISIBILITIES);
 export const runKindEnum = pgEnum('run_kind', ['run', 'tests']);
 export const runStatusEnum = pgEnum('run_status', RUN_STATUSES);
 export const difficultyEnum = pgEnum('difficulty', DIFFICULTIES);
+export const reportKindEnum = pgEnum('report_kind', REPORT_KINDS);
+export const reportStatusEnum = pgEnum('report_status', REPORT_STATUSES);
 
 // ---------------------------------------------------------------------------
 // Auth (managed by Better Auth; property names are the ones Better Auth expects)
@@ -357,6 +361,31 @@ export const practiceRatings = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// AI post-interview reports (one interviewer and one candidate report per round)
+// ---------------------------------------------------------------------------
+
+export const sessionReports = pgTable(
+  'session_reports',
+  {
+    id: id(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    roundNumber: integer('round_number').notNull().default(1),
+    kind: reportKindEnum('kind').notNull(),
+    status: reportStatusEnum('status').notNull().default('pending'),
+    /** The validated report JSON (see `interviewerReportSchema` / `candidateReportSchema`). */
+    content: jsonb('content').$type<Record<string, unknown>>(),
+    error: text('error'),
+    model: text('model'),
+    generatedAt: timestamp('generated_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('session_reports_room_round_kind_idx').on(t.roomId, t.roundNumber, t.kind)],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type RoomRow = typeof rooms.$inferSelect;
 export type ParticipantRow = typeof participants.$inferSelect;
@@ -366,3 +395,4 @@ export type QuestionRow = typeof questions.$inferSelect;
 export type TestCaseRow = typeof testCases.$inferSelect;
 export type SessionRoundRow = typeof sessionRounds.$inferSelect;
 export type PracticeRatingRow = typeof practiceRatings.$inferSelect;
+export type SessionReportRow = typeof sessionReports.$inferSelect;

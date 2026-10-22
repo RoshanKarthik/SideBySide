@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Badge, Card, ErrorNote, Skeleton, Spinner } from '@/components/ui/card';
 import { Avatar, Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/overlay';
 import { toast } from '@/components/ui/toaster';
+import { AiReports } from '@/reports/ai-reports';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
 import { cn, formatClock, formatDuration, timeAgo } from '@/lib/utils';
@@ -176,6 +177,8 @@ function SessionBody({ s }: { s: SessionSummary }) {
           ))}
         </div>
       )}
+
+      {round && <AiReports roomId={s.room.id} round={round.roundNumber} />}
 
       {round && (
         <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">

@@ -62,10 +62,17 @@ export async function guest(browser: Browser, name: string): Promise<Actor> {
 }
 
 /** From the dashboard: creates an interview room and opens it. Returns the room's slug. */
-export async function createRoom(page: Page, title: string) {
+export async function createRoom(
+  page: Page,
+  title: string,
+  options: { shareReport?: boolean } = {},
+) {
   await page.getByRole('button', { name: 'New room' }).click();
   await page.getByLabel('Title').fill(title);
   await page.getByLabel('Language').selectOption('python');
+  if (options.shareReport) {
+    await page.getByLabel('Share the feedback report with the candidate').check();
+  }
   await page.getByRole('button', { name: 'Create room' }).click();
   await page.getByRole('link', { name: 'Open room' }).click();
   await page.waitForURL('**/r/*');
