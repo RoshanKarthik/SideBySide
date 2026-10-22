@@ -33,6 +33,7 @@ beforeAll(async () => {
       getReplayLog: async () => new Uint8Array([1]),
       showQuestion: async () => {},
       revealHint: async () => true,
+      generateReports: async () => {},
     }),
     matchmaker: async () => {
       throw new Error('Not used in these tests');

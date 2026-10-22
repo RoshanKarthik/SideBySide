@@ -26,7 +26,8 @@ export interface RequestOptions extends RequestInit {
 }
 
 /** The API on an in-memory Postgres, with the room Durable Objects replaced by spies. */
-export async function createHarness() {
+export async function createHarness(envOverrides: Record<string, string> = {}) {
+  const env = { ...testEnv, ...envOverrides } as Env;
   const handle: DbHandle = await createTestDb();
   const roomRpc = {
     end: vi.fn(async () => {}),
@@ -35,6 +36,7 @@ export async function createHarness() {
     getReplayLog: vi.fn(async () => new Uint8Array([1])),
     showQuestion: vi.fn(async () => {}),
     revealHint: vi.fn(async () => true),
+    generateReports: vi.fn(async () => {}),
   } satisfies RoomRpc;
   // The real queue logic, creating rooms in the test database.
   const queue = new MatchQueue((a, b, prefs) => createPracticeRoom(handle.db, a, b, prefs));
@@ -56,7 +58,7 @@ export async function createHarness() {
     if (init.body) headers.set('content-type', 'application/json');
     if (init.cookie) headers.set('cookie', init.cookie);
     if (init.token) headers.set('authorization', `Bearer ${init.token}`);
-    return app.request(path, { ...init, headers }, testEnv);
+    return app.request(path, { ...init, headers }, env);
   };
 
   const json = async <T>(path: string, init: RequestOptions = {}, status = 200): Promise<T> => {

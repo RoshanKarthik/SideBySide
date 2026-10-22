@@ -17,6 +17,7 @@ import {
   NotebookPen,
   PanelRight,
   PenTool,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { Suspense, lazy, useEffect, useState } from 'react';
@@ -36,6 +37,7 @@ import {
   Tooltip,
 } from '@/components/ui/overlay';
 import { toast } from '@/components/ui/toaster';
+import { useReports } from '@/reports/ai-reports';
 import { api } from '@/lib/api';
 import { getGuestToken, setClaimToken } from '@/lib/guest-tokens';
 import { cn, colorFor } from '@/lib/utils';
@@ -418,9 +420,48 @@ function SessionEnded({
           <p className="mt-4 max-w-sm text-sm text-muted-foreground">
             Thanks for joining — you can close this tab now.
           </p>
+          <FeedbackPrompt roomId={roomId} slug={slug} />
           {getGuestToken(slug) && <ClaimPrompt roomId={roomId} slug={slug} />}
         </>
       )}
+    </div>
+  );
+}
+
+/** Candidates: a link to their AI feedback, when the interviewer shared it. */
+function FeedbackPrompt({ roomId, slug }: { roomId: string; slug: string }) {
+  const reports = useReports(roomId, 1, slug);
+  const report = reports.data?.candidate;
+  if (!reports.data?.enabled || !report) return null;
+  return (
+    <div className="mt-8 w-full max-w-md animate-fade-up rounded-2xl border bg-card p-5 text-left shadow-lg">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Sparkles className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">Your feedback</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {report.status === 'pending'
+              ? 'The interviewer shared written feedback with you. It’s being written now…'
+              : 'The interviewer shared written feedback on this session with you.'}
+          </p>
+          <Button
+            size="sm"
+            className="mt-3"
+            disabled={report.status === 'pending'}
+            asChild={report.status !== 'pending'}
+          >
+            {report.status === 'pending' ? (
+              <span>
+                <Spinner /> Writing…
+              </span>
+            ) : (
+              <Link to={`/r/${slug}/feedback`}>Read your feedback</Link>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

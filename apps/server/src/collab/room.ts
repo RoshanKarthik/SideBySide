@@ -10,12 +10,14 @@ import {
   type Database,
 } from '@sidebyside/db';
 import {
+  LANGUAGE_INFO,
   LIMITS,
   SNAPSHOT_INTERVAL_MS,
   clientMessageSchema,
   eventVisibility,
   isInterviewerRole,
   parseRoomDocumentName,
+  roomDocumentName,
   type ClientMessage,
   type EventType,
   type Lang,
@@ -24,17 +26,22 @@ import {
   type ServerMessage,
 } from '@sidebyside/shared';
 import {
+  getCodeMap,
   getHints,
+  getNotes,
   getRubric,
   initializeSharedDoc,
+  notesToText,
   readProblem,
   showQuestionInDoc,
   type SharedProblem,
 } from '@sidebyside/shared/doc';
 import { encodeReplayLog, type ReplaySnapshot, type ReplayUpdate } from '@sidebyside/shared/replay';
-import type { Connection, ConnectionContext } from 'partyserver';
+import { getServerByName, type Connection, type ConnectionContext, type Server } from 'partyserver';
 import { YServer } from 'y-partyserver';
 import * as Y from 'yjs';
+import { providerFromEnv } from '../ai/provider';
+import { runReportJob, type DocTexts } from '../ai/summary';
 import { canRecordRun, type DocumentPart } from '../auth/permissions';
 import type { Actor } from '../context';
 import { CLOSE_CODES, CONNECTION_HEADER, type ConnectionInfo } from './protocol';
@@ -379,6 +386,62 @@ export class Room extends YServer {
     for (const connection of this.getConnections()) {
       connection.close(CLOSE_CODES.roundChanged, 'Next round');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // AI post-interview reports
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Writes this round's reports in the background (shared document only): an alarm runs the
+   * job, so it survives this request ending and is retried if it fails unexpectedly.
+   */
+  async generateReports(): Promise<void> {
+    if (this.part !== 'shared') return;
+    await this.ctx.storage.setAlarm(Date.now() + 500);
+  }
+
+  /** The notes of this document as plain text (shared notes, or the private notes). */
+  async notesText(): Promise<string> {
+    return notesToText(getNotes(this.document));
+  }
+
+  override async onAlarm(): Promise<void> {
+    if (this.part !== 'shared') return;
+    const provider = providerFromEnv(this.env as unknown as Parameters<typeof providerFromEnv>[0]);
+    if (!provider) return;
+    const { roomId, round } = this;
+    const privateDoc = (await getServerByName(
+      this.env.Room as unknown as DurableObjectNamespace<Server>,
+      roomDocumentName(roomId, 'private', round),
+    )) as unknown as DurableObjectStub<Room>;
+    const docs: DocTexts = {
+      sharedNotes: notesToText(getNotes(this.document)),
+      privateNotes: await privateDoc.notesText(),
+      code: this.writtenCode(),
+    };
+    const handle = await connectDb(this.env.HYPERDRIVE.connectionString);
+    try {
+      await runReportJob({ db: handle.db, provider, roomId, round, docs });
+    } finally {
+      await handle.close();
+    }
+  }
+
+  /** Code per language that differs from the starter (and isn't empty). */
+  private writtenCode(): DocTexts['code'] {
+    const loaded = (this.document.getMap('meta').get('loadedStarters') ?? {}) as Record<
+      string,
+      string
+    >;
+    const code: DocTexts['code'] = {};
+    for (const [lang, text] of getCodeMap(this.document).entries()) {
+      const source = text.toString();
+      const starter = LANGUAGE_INFO[lang as Lang]?.starter;
+      if (!starter || !source.trim() || source === starter || source === loaded[lang]) continue;
+      code[lang as Lang] = source;
+    }
+    return code;
   }
 
   /** Deletes everything this document stored (session or account deletion). */

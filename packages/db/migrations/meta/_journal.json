@@ -36,6 +36,13 @@
       "when": 1792599449769,
       "tag": "0004_claim_token_index",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792641269408,
+      "tag": "0005_ai_reports",
+      "breakpoints": true
     }
   ]
 }

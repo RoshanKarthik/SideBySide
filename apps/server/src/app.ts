@@ -3,6 +3,7 @@ import { claimRoutes } from './api/claim';
 import { meRoutes } from './api/me';
 import { practiceRoutes } from './api/practice';
 import { questionRoutes } from './api/questions';
+import { reportRoutes } from './api/reports';
 import { roomToolRoutes } from './api/room-tools';
 import { roomRoutes } from './api/rooms';
 import { sessionRoutes } from './api/sessions';
@@ -66,6 +67,7 @@ export function createApp(deps: AppDeps) {
   app.route('/', questionRoutes());
   app.route('/', practiceRoutes(deps));
   app.route('/', claimRoutes());
+  app.route('/', reportRoutes(deps));
 
   return app;
 }

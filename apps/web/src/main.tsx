@@ -57,6 +57,7 @@ const pages = {
   session: () => import('@/routes/session'),
   practice: () => import('@/routes/practice'),
   settings: () => import('@/routes/settings'),
+  feedback: () => import('@/routes/feedback'),
   claim: () => import('@/routes/claim'),
 };
 
@@ -78,6 +79,7 @@ const router = createBrowserRouter([
   { path: '/login', element: lazyPage(pages.login) },
   { path: '/dashboard', element: <DashboardPage /> },
   { path: '/r/:slug', element: lazyPage(pages.room) },
+  { path: '/r/:slug/feedback', element: lazyPage(pages.feedback) },
   { path: '/rooms/:id/replay', element: lazyPage(pages.replay) },
   { path: '/questions', element: lazyPage(pages.questions) },
   { path: '/questions/:id', element: lazyPage(pages.question) },
