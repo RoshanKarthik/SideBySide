@@ -13,6 +13,9 @@ export default tseslint.config(
       '**/worker-configuration.d.ts',
       'packages/db/migrations/**',
       'apps/web/public/pyodide/**',
+      // Playwright's HTML report (with its trace viewer) and failure artifacts.
+      'apps/e2e/playwright-report/**',
+      'apps/e2e/test-results/**',
     ],
   },
   js.configs.recommended,
