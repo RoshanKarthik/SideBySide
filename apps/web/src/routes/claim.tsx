@@ -1,6 +1,6 @@
 import type { ClaimSessionResponse } from '@sidebyside/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, BookmarkCheck, CheckCircle2, History } from 'lucide-react';
+import { ArrowRight, BookmarkCheck, CheckCircle2, History, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { AuthLayout } from '@/components/marketing/auth-layout';
@@ -33,18 +33,29 @@ export default function ClaimPage() {
   let content;
   if (claim.isSuccess) {
     const { room } = claim.data;
+    const shared = [
+      room.shareReportWithCandidate && 'your feedback',
+      room.shareReplayWithCandidate && 'the replay',
+    ].filter(Boolean);
     content = (
       <>
         <CheckCircle2 className="size-8 text-success" />
         <h1 className="mt-4 text-3xl font-semibold tracking-tight">Saved to your account</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           “{room.title}” is on your dashboard now
-          {room.shareReplayWithCandidate ? ', with its replay' : ''}. It stays there until the
+          {shared.length ? `, with ${shared.join(' and ')}` : ''}. It stays there until the
           interviewer’s retention period ends.
         </p>
         <div className="mt-8 flex flex-wrap gap-2">
-          {room.shareReplayWithCandidate && (
+          {room.shareReportWithCandidate && (
             <Button variant="glow" asChild>
+              <Link to={`/r/${room.slug}/feedback`}>
+                <Sparkles /> Read your feedback
+              </Link>
+            </Button>
+          )}
+          {room.shareReplayWithCandidate && (
+            <Button variant={room.shareReportWithCandidate ? 'outline' : 'glow'} asChild>
               <Link to={`/rooms/${room.id}/replay`}>
                 <History /> Watch the replay
               </Link>

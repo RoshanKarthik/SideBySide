@@ -23,6 +23,7 @@ import {
   Plus,
   Radio,
   Search,
+  Sparkles,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -382,15 +383,15 @@ function RoomRow({ room }: { room: RoomListItem }) {
   const link = `${window.location.origin}/r/${room.slug}`;
   const ended = room.status === 'ended';
   const duration = durationOf(room);
-  // A candidate who saved a session can open its replay when it was shared, never the summary.
+  // A candidate who saved a session can open what the interviewer shared with them (their
+  // feedback, the replay), never the summary.
   const candidate = room.myRole === 'candidate';
   const replay = !candidate || room.shareReplayWithCandidate;
+  const feedback = candidate && room.shareReportWithCandidate ? `/r/${room.slug}/feedback` : null;
   const open = !ended
     ? `/r/${room.slug}`
     : candidate
-      ? replay
-        ? `/rooms/${room.id}/replay`
-        : null
+      ? (feedback ?? (replay ? `/rooms/${room.id}/replay` : null))
       : `/sessions/${room.id}`;
 
   return (
@@ -465,7 +466,9 @@ function RoomRow({ room }: { room: RoomListItem }) {
           {ended ? (
             open && (
               <Button size="sm" variant="outline" asChild>
-                <Link to={open}>{candidate ? 'Replay' : 'Summary'}</Link>
+                <Link to={open}>
+                  {!candidate ? 'Summary' : open === feedback ? 'Feedback' : 'Replay'}
+                </Link>
               </Button>
             )
           ) : (
@@ -486,6 +489,11 @@ function RoomRow({ room }: { room: RoomListItem }) {
                     {!candidate && (
                       <MenuItem onSelect={() => navigate(`/sessions/${room.id}`)}>
                         <FileText /> Session summary
+                      </MenuItem>
+                    )}
+                    {feedback && (
+                      <MenuItem onSelect={() => navigate(feedback)}>
+                        <Sparkles /> Read feedback
                       </MenuItem>
                     )}
                     {replay && (

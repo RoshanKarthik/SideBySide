@@ -25,8 +25,8 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 - When the interviewer ends the session, a session summary (rubric, timeline, test results,
   signals) and a replay of notes, code and whiteboard with markers for every key moment.
 - **Keep your feedback:** when the interviewer shares the replay or report, a guest candidate
-  can save the ended session to an account (sign up or sign in) from the "Session ended" screen
-  and open it later from their dashboard.
+  can save the ended session to an account (sign up or sign in) from the "Session ended" screen,
+  then open their AI feedback and the replay (whichever were shared) from their dashboard.
 - **Retention:** each room is deleted for good once its retention period (7, 30 or 90 days
   after the session ends) is over. A daily Cron Trigger purges the room's Durable Object
   documents, then its Postgres rows.
@@ -289,5 +289,5 @@ each step. The tests are not part of `pnpm test`.
   whose documents can't be purged keeps its row and is retried on the next run.
 - A guest can claim a session only from the browser they used for the interview (the claim
   token is kept in that browser's storage, not in a link), and only after it has ended.
-- Candidate feedback reports aren't generated yet, so a claimed session where only the report
-  is shared has nothing to open until reports exist.
+- If AI reports are turned off (`AI_SUMMARY_PROVIDER=off`), a claimed session where only the
+  report is shared opens a "no feedback" page.
