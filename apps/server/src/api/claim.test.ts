@@ -9,15 +9,18 @@ import type {
   CreateRoomResponse,
   JoinRoomResponse,
   RoomListItem,
+  SessionReports,
 } from '@sidebyside/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { sampleProvider } from '../ai/provider';
+import { runReportJob } from '../ai/summary';
 import { createHarness } from '../testing/harness';
 
 let h: Awaited<ReturnType<typeof createHarness>>;
 let owner: string;
 
 beforeAll(async () => {
-  h = await createHarness();
+  h = await createHarness({ AI_SUMMARY_PROVIDER: 'sample' });
   owner = await h.signUp('claim-owner@example.test', 'Priya');
 });
 afterAll(async () => {
@@ -165,11 +168,38 @@ describe('guest claim flow', () => {
     expect(res.status).toBe(403);
   });
 
-  it('allows a claim when only the report is shared', async () => {
+  it('lets the account read the shared feedback once it claims a report-only session', async () => {
     const reportOnly = await interview({ report: true });
     await endRoom(reportOnly.room.id);
-    const res = await requestClaimToken(reportOnly.room.id, reportOnly.token);
-    expect(res.status).toBe(200);
+    await runReportJob({
+      db: h.db,
+      provider: sampleProvider(),
+      roomId: reportOnly.room.id,
+      round: 1,
+      docs: { sharedNotes: 'shared', privateNotes: 'private', code: { python: 'print(1)' } },
+    });
+    const { claimToken: token } = await h.json<ClaimTokenResponse>(
+      `/api/rooms/${reportOnly.room.id}/claim-token`,
+      { method: 'POST', token: reportOnly.token },
+    );
+    const user = await h.signUp('claim-report@example.test', 'Report Reader');
+    expect((await claim(token, user)).status).toBe(200);
+
+    // The feedback page finds the seat through the account, then loads the candidate report.
+    const me = await h.json<JoinRoomResponse>(`/api/rooms/${reportOnly.room.slug}/me`, {
+      cookie: user,
+    });
+    expect(me.participant.role).toBe('candidate');
+    const reports = await h.json<SessionReports>(`/api/rooms/${reportOnly.room.id}/reports`, {
+      cookie: user,
+    });
+    expect(reports.candidate?.status).toBe('ready');
+    expect(reports.interviewer).toBeNull();
+    // Nothing else was shared, so the replay stays closed.
+    const replay = await h.call(`/api/rooms/${reportOnly.room.id}/replay/manifest`, {
+      cookie: user,
+    });
+    expect(replay.status).toBe(403);
   });
 
   it('refuses a claim if sharing was turned off after the token was issued', async () => {
