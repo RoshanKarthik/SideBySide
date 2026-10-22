@@ -11,8 +11,10 @@ import {
   type SharedRun,
   type TestRun,
 } from '@sidebyside/shared';
+import * as encoding from 'lib0/encoding';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import YProvider from 'y-partyserver/provider';
+import { encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 import { getGuestToken } from '@/lib/guest-tokens';
 import { colorFor } from '@/lib/utils';
@@ -77,6 +79,23 @@ interface Live {
   provider: YProvider;
 }
 
+/** y-protocols' awareness message type on the room socket. */
+const MESSAGE_AWARENESS = 1;
+
+/**
+ * Sends this client's presence to the room again. The provider only sends presence when it
+ * changes, and setting the same state again isn't a change, so this writes the message itself.
+ */
+function announcePresence(provider: YProvider): void {
+  const ws = provider.ws;
+  const clientId = provider.awareness.clientID;
+  if (ws?.readyState !== WebSocket.OPEN || !provider.awareness.getLocalState()) return;
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, MESSAGE_AWARENESS);
+  encoding.writeVarUint8Array(encoder, encodeAwarenessUpdate(provider.awareness, [clientId]));
+  ws.send(encoding.toUint8Array(encoder));
+}
+
 /** Connects to the room's shared document and tracks presence, runs and events. */
 export function useRoom(room: Room, participant: Participant, slug: string): RoomConnection | null {
   const [live, setLive] = useState<Live | null>(null);
@@ -124,11 +143,8 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
     const onAwareness = ({ added }: { added: number[] }) => {
       // Someone new arrived: announce ourselves again right away. The room forgets presence
       // when it sleeps between messages, so a newcomer would otherwise not see us until our
-      // next 15-second renewal.
-      if (added.some((id) => id !== doc.clientID)) {
-        const local = provider.awareness.getLocalState();
-        if (local) provider.awareness.setLocalState(local);
-      }
+      // presence next changes (the provider sends no periodic renewal).
+      if (added.some((id) => id !== doc.clientID)) announcePresence(provider);
       if (awarenessQueued) return;
       awarenessQueued = true;
       queueMicrotask(readAwareness);
@@ -221,11 +237,17 @@ export function useRoom(room: Room, participant: Participant, slug: string): Roo
       role: participant.role,
     } satisfies PresenceState['user']);
     provider.awareness.setLocalStateField('tab', 'discuss');
-    void provider.connect();
+    // `connect` opens the socket after an await, so an unmount in between (React's development
+    // double mount, or leaving quickly) would otherwise leave an orphan connection open.
+    let disposed = false;
+    void provider.connect().then(() => {
+      if (disposed) provider.disconnect();
+    });
     // The provider is created here and destroyed by this cleanup, so it cannot come from render.
     setLive({ doc, provider });
 
     return () => {
+      disposed = true;
       provider.off('status', onStatus);
       provider.off('sync', onSync);
       provider.off('custom-message', onCustom);

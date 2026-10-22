@@ -145,7 +145,7 @@ docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=
 | `pnpm db:seed`     | Load (or refresh) the public question bank         |
 
 To run the daily retention cleanup by hand while `pnpm dev` is running:
-`curl "http://localhost:8787/cdn-cgi/handler/scheduled"`.
+`curl "http://127.0.0.1:8787/cdn-cgi/local/scheduled"`.
 
 ### End-to-end tests
 
