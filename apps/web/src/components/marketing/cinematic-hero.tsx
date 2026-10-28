@@ -138,18 +138,20 @@ export function CinematicHero({ id }: { id?: string }) {
           hidden tests and a whiteboard. No installs, and every keystroke can be replayed
           afterwards.
         </p>
-        <Link
-          to={start}
-          className="animate-fade-rise-delay-2 liquid-glass mt-12 cursor-pointer rounded-full px-14 py-5 text-base text-foreground hover:scale-[1.03]"
-        >
-          Start an interview
-        </Link>
-        <Link
-          to={session ? '/practice' : '/login?next=/practice'}
-          className="animate-fade-rise-delay-2 mt-6 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          or practise with a peer →
-        </Link>
+        <div className="animate-fade-rise-delay-2 mt-12 flex w-full flex-col items-center justify-center gap-4 sm:w-auto sm:flex-row">
+          <Link
+            to={start}
+            className="liquid-glass w-full cursor-pointer rounded-full px-12 py-5 text-base text-foreground hover:scale-[1.03] sm:w-auto"
+          >
+            Start an interview
+          </Link>
+          <Link
+            to={session ? '/practice' : '/login?next=/practice'}
+            className="liquid-glass w-full cursor-pointer rounded-full px-12 py-5 text-base text-foreground hover:scale-[1.03] sm:w-auto"
+          >
+            Practise with a peer
+          </Link>
+        </div>
       </div>
     </section>
   );
