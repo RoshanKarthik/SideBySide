@@ -241,8 +241,10 @@ each step. The tests are not part of `pnpm test`.
 7. **Deploy:**
 
    ```bash
-   pnpm deploy
+   pnpm run deploy
    ```
+
+   (`pnpm deploy` without `run` is a different, built-in pnpm command.)
 
 ### Production checklist
 
