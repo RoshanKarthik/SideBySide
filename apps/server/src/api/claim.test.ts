@@ -218,3 +218,51 @@ describe('guest claim flow', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('when the server writes no AI reports', () => {
+  let off: Awaited<ReturnType<typeof createHarness>>;
+  let interviewer: string;
+
+  beforeAll(async () => {
+    off = await createHarness({ AI_SUMMARY_PROVIDER: 'off' });
+    interviewer = await off.signUp('claim-off-owner@example.test', 'Priya');
+  });
+  afterAll(async () => {
+    await off.close();
+  });
+
+  const endedWith = async (share: { replay?: boolean; report?: boolean }) => {
+    const { room } = await off.json<CreateRoomResponse>(
+      '/api/rooms',
+      {
+        method: 'POST',
+        cookie: interviewer,
+        body: JSON.stringify({
+          title: 'Backend round',
+          defaultLanguage: 'python',
+          shareReplayWithCandidate: share.replay ?? false,
+          shareReportWithCandidate: share.report ?? false,
+        }),
+      },
+      201,
+    );
+    const guest = await off.json<JoinRoomResponse>(`/api/rooms/${room.slug}/join`, {
+      method: 'POST',
+      body: JSON.stringify({ displayName: 'Asha', consent: true }),
+    });
+    await off.json(`/api/rooms/${room.id}/end`, { method: 'POST', cookie: interviewer });
+    return { roomId: room.id, token: guest.collabToken! };
+  };
+
+  it('offers no claim when only the report is shared, since there is no report', async () => {
+    const { roomId, token } = await endedWith({ report: true });
+    const res = await off.call(`/api/rooms/${roomId}/claim-token`, { method: 'POST', token });
+    expect(res.status).toBe(403);
+  });
+
+  it('still offers a claim when the replay is shared', async () => {
+    const { roomId, token } = await endedWith({ replay: true, report: true });
+    const res = await off.call(`/api/rooms/${roomId}/claim-token`, { method: 'POST', token });
+    expect(res.status).toBe(200);
+  });
+});

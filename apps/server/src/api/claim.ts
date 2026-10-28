@@ -10,6 +10,7 @@ import { canClaimSession } from '../auth/permissions';
 import type { AppEnv } from '../context';
 import { conflict, forbidden, notFound, unauthorized } from '../lib/errors';
 import { toRoomDto } from '../lib/serialize';
+import { reportsEnabled } from './reports';
 import { parseBody } from '../lib/validate';
 
 const encoder = new TextEncoder();
@@ -57,7 +58,7 @@ export function claimRoutes() {
     );
     if (!membership) throw notFound('Room not found');
     const { participant } = membership;
-    if (!canClaimSession(participant, room)) {
+    if (!canClaimSession(participant, room, reportsEnabled(c.env))) {
       throw forbidden('There is nothing in this session to save to an account');
     }
     const claimToken = await deriveClaimToken(participant.id, c.env.GUEST_TOKEN_SECRET);
@@ -85,7 +86,7 @@ export function claimRoutes() {
     }
     const room = await findRoomById(db, participant.roomId);
     if (!room) throw notFound('This link has already been used or the session was deleted');
-    if (!canClaimSession(participant, room)) {
+    if (!canClaimSession(participant, room, reportsEnabled(c.env))) {
       throw forbidden('The interviewer is no longer sharing anything from this session');
     }
     const [existing] = await db

@@ -91,18 +91,20 @@ export interface ClaimFacts {
 
 /**
  * A guest candidate can attach an ended interview to an account, to keep its replay or report,
- * when the interviewer shared one of them. Seats that already belong to an account can't be.
+ * when the interviewer shared one of them (a shared report counts only when the server writes
+ * reports). Seats that already belong to an account can't be.
  */
 export function canClaimSession(
   participant: { role: RoomRole; userId: string | null },
   room: ClaimFacts,
+  reportsEnabled: boolean,
 ): boolean {
   return (
     participant.role === 'candidate' &&
     participant.userId === null &&
     room.mode === 'interview' &&
     room.status === 'ended' &&
-    (room.shareReplayWithCandidate || room.shareReportWithCandidate)
+    (room.shareReplayWithCandidate || (room.shareReportWithCandidate && reportsEnabled))
   );
 }
 

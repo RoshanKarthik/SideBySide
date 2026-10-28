@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorNote, Skeleton, Spinner } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { signOut, useSession } from '@/lib/auth-client';
-import { clearClaimToken, getClaimToken } from '@/lib/guest-tokens';
+import { clearClaimToken, getClaimToken, takeClaimTokenFromUrl } from '@/lib/guest-tokens';
 import { Link } from '@/lib/navigation';
 
 /**
@@ -17,7 +17,7 @@ import { Link } from '@/lib/navigation';
  */
 export default function ClaimPage() {
   const { roomId = '' } = useParams();
-  const [claimToken] = useState(() => getClaimToken(roomId));
+  const [claimToken] = useState(() => takeClaimTokenFromUrl(roomId) ?? getClaimToken(roomId));
   const { data: session, isPending } = useSession();
   const queryClient = useQueryClient();
   const claim = useMutation({
@@ -72,8 +72,8 @@ export default function ClaimPage() {
       <>
         <h1 className="text-3xl font-semibold tracking-tight">This link can’t be used here</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Open it in the same browser you used for the interview, from the “Session ended” screen.
-          If you already saved the session, it’s on your dashboard.
+          Open it from the “Session ended” screen in the browser you used for the interview, or use
+          the full link you copied there. If you already saved the session, it’s on your dashboard.
         </p>
         <Button className="mt-8" variant="outline" asChild>
           <Link to="/dashboard">Go to your dashboard</Link>

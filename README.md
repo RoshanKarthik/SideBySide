@@ -28,7 +28,8 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
   signals) and a replay of notes, code and whiteboard with markers for every key moment.
 - **Keep your feedback:** when the interviewer shares the replay or report, a guest candidate
   can save the ended session to an account (sign up or sign in) from the "Session ended" screen,
-  then open their AI feedback and the replay (whichever were shared) from their dashboard.
+  or copy a private link to do it later on any device, then open their AI feedback and the
+  replay (whichever were shared) from their dashboard.
 - **Deleting sessions:** the interviewer who owns a session can delete it for everyone at any
   time. Anyone else (a practice partner, a co-interviewer, a candidate who saved it) removes it
   from their own sessions; a practice session is deleted for good once both partners remove it.
@@ -355,7 +356,3 @@ each step. The tests are not part of `pnpm test`.
 - Retention cleanup runs every hour and deletes at most 100 rooms per run, so a room can
   outlive its `delete_after` date by up to an hour (longer only with a backlog of over 100
   expired rooms). A room whose documents can't be purged keeps its row and is retried next run.
-- A guest can claim a session only from the browser they used for the interview (the claim
-  token is kept in that browser's storage, not in a link), and only after it has ended.
-- If AI reports are turned off (`AI_SUMMARY_PROVIDER=off`), a claimed session where only the
-  report is shared opens a "no feedback" page.

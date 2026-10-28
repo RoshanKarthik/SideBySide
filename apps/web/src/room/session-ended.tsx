@@ -1,11 +1,12 @@
 import type { ClaimTokenResponse } from '@sidebyside/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookmarkCheck, Flag, Sparkles } from 'lucide-react';
+import { ArrowRight, BookmarkCheck, Copy, Flag, Sparkles } from 'lucide-react';
 import { Link } from '@/lib/navigation';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/card';
+import { toast } from '@/components/ui/toaster';
 import { api } from '@/lib/api';
-import { getGuestToken, setClaimToken } from '@/lib/guest-tokens';
+import { claimLink, getGuestToken, setClaimToken } from '@/lib/guest-tokens';
 import { useReports } from '@/reports/ai-reports';
 import { RateYourPartner } from './room-extras';
 
@@ -134,6 +135,19 @@ function ClaimPrompt({ roomId, slug }: { roomId: string; slug: string }) {
         <Link to={`/claim/${roomId}`}>
           Save to an account <ArrowRight />
         </Link>
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mt-2 w-full text-muted-foreground"
+        onClick={async () => {
+          await navigator.clipboard.writeText(claimLink(roomId, claim.data));
+          toast.success(
+            'Link copied. Keep it private: whoever opens it first can save this session.',
+          );
+        }}
+      >
+        <Copy /> Copy a link to do this later, on any device
       </Button>
     </div>
   );

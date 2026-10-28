@@ -45,19 +45,17 @@ describe('permissions', () => {
       shareReplayWithCandidate: true,
       shareReportWithCandidate: false,
     };
-    expect(canClaimSession(guest, room)).toBe(true);
-    expect(
-      canClaimSession(guest, {
-        ...room,
-        shareReplayWithCandidate: false,
-        shareReportWithCandidate: true,
-      }),
-    ).toBe(true);
-    expect(canClaimSession(guest, { ...room, shareReplayWithCandidate: false })).toBe(false);
-    expect(canClaimSession(guest, { ...room, status: 'live' })).toBe(false);
-    expect(canClaimSession(guest, { ...room, mode: 'practice' })).toBe(false);
-    expect(canClaimSession({ ...guest, userId: 'u1' }, room)).toBe(false);
-    expect(canClaimSession({ role: 'interviewer', userId: null }, room)).toBe(false);
+    expect(canClaimSession(guest, room, true)).toBe(true);
+    const reportOnly = { ...room, shareReplayWithCandidate: false, shareReportWithCandidate: true };
+    expect(canClaimSession(guest, reportOnly, true)).toBe(true);
+    // A shared report is nothing to keep when the server doesn't write reports.
+    expect(canClaimSession(guest, reportOnly, false)).toBe(false);
+    expect(canClaimSession(guest, room, false)).toBe(true);
+    expect(canClaimSession(guest, { ...room, shareReplayWithCandidate: false }, true)).toBe(false);
+    expect(canClaimSession(guest, { ...room, status: 'live' }, true)).toBe(false);
+    expect(canClaimSession(guest, { ...room, mode: 'practice' }, true)).toBe(false);
+    expect(canClaimSession({ ...guest, userId: 'u1' }, room, true)).toBe(false);
+    expect(canClaimSession({ role: 'interviewer', userId: null }, room, true)).toBe(false);
   });
 
   it('lets everyone signed in except the owner remove a session from their own list', () => {

@@ -49,3 +49,20 @@ export function clearClaimToken(roomId: string): void {
     // Nothing to clear.
   }
 }
+
+/**
+ * A link that claims the session from any browser: the token rides in the fragment, which
+ * browsers never send to a server or leak in Referer headers.
+ */
+export function claimLink(roomId: string, token: string): string {
+  return `${window.location.origin}/claim/${roomId}#t=${encodeURIComponent(token)}`;
+}
+
+/** Moves a token from a claim link's fragment into this browser's storage and off the URL. */
+export function takeClaimTokenFromUrl(roomId: string): string | null {
+  const token = new URLSearchParams(window.location.hash.slice(1)).get('t');
+  if (!token) return null;
+  setClaimToken(roomId, token);
+  window.history.replaceState(window.history.state, '', window.location.pathname);
+  return token;
+}
