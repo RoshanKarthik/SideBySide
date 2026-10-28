@@ -33,7 +33,7 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
   time. Anyone else (a practice partner, a co-interviewer, a candidate who saved it) removes it
   from their own sessions; a practice session is deleted for good once both partners remove it.
 - **Retention:** each room is deleted for good once its retention period (7, 30 or 90 days
-  after the session ends) is over. A daily Cron Trigger purges the room's Durable Object
+  after the session ends) is over. An hourly Cron Trigger purges the room's Durable Object
   documents, then its Postgres rows.
 - **AI post-interview reports** (Cloudflare Workers AI, free tier): when a session ends, a draft
   report for the hiring team (approach, correctness, complexity, code quality, hints, key
@@ -85,7 +85,7 @@ flowchart LR
     worker["Worker<br/>static assets · Hono REST API · Better Auth"]
     room["Room Durable Object<br/>one per room document<br/>Yjs sync · update log and snapshots in SQLite"]
     matchmaker["Matchmaker Durable Object<br/>practice queue"]
-    cron["Cron Trigger<br/>daily retention cleanup"]
+    cron["Cron Trigger<br/>hourly retention cleanup"]
     ai["Workers AI<br/>post-interview reports"]
     hyperdrive["Hyperdrive<br/>pooled Postgres connections"]
   end
@@ -207,7 +207,7 @@ gzipped JavaScript the room page needs before the code editor and whiteboard loa
 today, against a target of about 400 KB) and what every page needs (about 177 KB). The code
 editor, whiteboard, interviewer panel, markdown renderer and every other page load on demand.
 
-To run the daily retention cleanup by hand while `pnpm dev` is running:
+To run the hourly retention cleanup by hand while `pnpm dev` is running:
 `curl "http://127.0.0.1:8787/cdn-cgi/local/scheduled"`.
 
 ### End-to-end tests
@@ -303,7 +303,7 @@ each step. The tests are not part of `pnpm test`.
 - `ALLOW_DEV_LOGIN` is `"false"` and the secrets are long random values.
 - `PUBLIC_APP_URL` matches the deployed origin; OAuth callback URLs match it too.
 - Migrations have been applied to the production branch.
-- The retention Cron Trigger (`30 3 * * *`, from `wrangler.jsonc`) shows under the Worker's
+- The retention Cron Trigger (`30 * * * *`, from `wrangler.jsonc`) shows under the Worker's
   Settings → Triggers. Cron Triggers are included in the free plan.
 - The Privacy and Terms pages contain reviewed text. They are placeholders today; have them
   reviewed (for example against India's Digital Personal Data Protection Act) before a public
@@ -352,9 +352,9 @@ each step. The tests are not part of `pnpm test`.
   sessions' reports). Beyond that, reports fail with a quota message until the next day and can
   be regenerated then.
 - Sign-in by email link isn't available (it needs an email sender and a domain).
-- Retention cleanup runs once a day (03:30 UTC) and deletes at most 100 rooms per run, so a
-  room can outlive its `delete_after` date by up to a day, longer if there is a backlog. A room
-  whose documents can't be purged keeps its row and is retried on the next run.
+- Retention cleanup runs every hour and deletes at most 100 rooms per run, so a room can
+  outlive its `delete_after` date by up to an hour (longer only with a backlog of over 100
+  expired rooms). A room whose documents can't be purged keeps its row and is retried next run.
 - A guest can claim a session only from the browser they used for the interview (the claim
   token is kept in that browser's storage, not in a link), and only after it has ended.
 - If AI reports are turned off (`AI_SUMMARY_PROVIDER=off`), a claimed session where only the

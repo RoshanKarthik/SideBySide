@@ -43,8 +43,8 @@
     // Workers AI model id; empty uses the default (see src/ai/provider.ts).
     "AI_MODEL": "",
   },
-  // Daily retention cleanup: deletes rooms past their `delete_after` date (src/jobs/retention.ts).
-  "triggers": { "crons": ["30 3 * * *"] },
+  // Hourly retention cleanup: deletes rooms past their `delete_after` date (src/jobs/retention.ts).
+  "triggers": { "crons": ["30 * * * *"] },
   "observability": { "enabled": true },
   "send_metrics": false,
 }

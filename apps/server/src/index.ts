@@ -59,7 +59,7 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  /** Daily cron (see wrangler.jsonc): deletes rooms whose retention period is over. */
+  /** Hourly cron (see wrangler.jsonc): deletes rooms whose retention period is over. */
   async scheduled(_controller, env, ctx): Promise<void> {
     const handle = await deps.openDb(env);
     try {
