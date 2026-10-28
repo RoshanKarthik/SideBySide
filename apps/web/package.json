@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "size": "vite build --manifest && node scripts/bundle-size.mjs dist"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",

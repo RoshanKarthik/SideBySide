@@ -8,9 +8,6 @@ import { TooltipProvider } from '@/components/ui/overlay';
 import { Toaster } from '@/components/ui/toaster';
 import { ApiRequestError } from '@/lib/api';
 import { usePreferenceClasses } from '@/lib/use-me';
-import { DashboardPage } from '@/routes/dashboard';
-import { NotFoundPage } from '@/routes/not-found';
-import { PrivacyPage, TermsPage } from '@/routes/legal';
 import './index.css';
 
 function PageLoader() {
@@ -59,6 +56,11 @@ const pages = {
   settings: () => import('@/routes/settings'),
   feedback: () => import('@/routes/feedback'),
   claim: () => import('@/routes/claim'),
+  // Named exports, so every page stays out of the bundle the room and landing pages load first.
+  dashboard: () => import('@/routes/dashboard').then((m) => ({ default: m.DashboardPage })),
+  privacy: () => import('@/routes/legal').then((m) => ({ default: m.PrivacyPage })),
+  terms: () => import('@/routes/legal').then((m) => ({ default: m.TermsPage })),
+  notFound: () => import('@/routes/not-found').then((m) => ({ default: m.NotFoundPage })),
 };
 
 /**
@@ -77,7 +79,7 @@ function preloadPages() {
 const router = createBrowserRouter([
   { path: '/', element: lazyPage(pages.landing) },
   { path: '/login', element: lazyPage(pages.login) },
-  { path: '/dashboard', element: <DashboardPage /> },
+  { path: '/dashboard', element: lazyPage(pages.dashboard) },
   { path: '/r/:slug', element: lazyPage(pages.room) },
   { path: '/r/:slug/feedback', element: lazyPage(pages.feedback) },
   { path: '/rooms/:id/replay', element: lazyPage(pages.replay) },
@@ -87,9 +89,9 @@ const router = createBrowserRouter([
   { path: '/practice', element: lazyPage(pages.practice) },
   { path: '/settings', element: lazyPage(pages.settings) },
   { path: '/claim/:roomId', element: lazyPage(pages.claim) },
-  { path: '/privacy', element: <PrivacyPage /> },
-  { path: '/terms', element: <TermsPage /> },
-  { path: '*', element: <NotFoundPage /> },
+  { path: '/privacy', element: lazyPage(pages.privacy) },
+  { path: '/terms', element: lazyPage(pages.terms) },
+  { path: '*', element: lazyPage(pages.notFound) },
 ]);
 
 preloadPages();

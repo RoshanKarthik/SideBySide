@@ -32,7 +32,7 @@ import {
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '@/lib/navigation';
 import type * as Y from 'yjs';
-import { LogoMark, ThemeToggle } from '@/components/layout';
+import { LogoMark, ThemeToggle } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Badge, Kbd, Spinner } from '@/components/ui/card';
 import { NativeSelect } from '@/components/ui/form';

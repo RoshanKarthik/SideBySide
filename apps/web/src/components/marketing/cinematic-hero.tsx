@@ -1,7 +1,7 @@
 import '@fontsource/instrument-serif/400.css';
 import './cinematic.css';
 import { useCallback, useState } from 'react';
-import { ThemeToggle } from '@/components/layout';
+import { ThemeToggle } from '@/components/logo';
 import { useSession } from '@/lib/auth-client';
 import { Link } from '@/lib/navigation';
 import { cn } from '@/lib/utils';

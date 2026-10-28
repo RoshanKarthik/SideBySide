@@ -16,7 +16,7 @@ import {
   UserPlus,
   Video,
 } from 'lucide-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { Suspense, lazy, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router';
 import { Link, useNavigate, withViewTransition } from '@/lib/navigation';
 import { Lobby } from '@/call/lobby';
@@ -32,7 +32,9 @@ import { useSession } from '@/lib/auth-client';
 import { setGuestToken } from '@/lib/guest-tokens';
 import { useMe } from '@/lib/use-me';
 import { RoomView } from '@/room/room-view';
-import { NotFoundPage } from './not-found';
+
+// Only shown for a bad link; loading it lazily keeps the app layout out of the room's bundle.
+const NotFoundPage = lazy(() => import('./not-found').then((m) => ({ default: m.NotFoundPage })));
 
 /** `/r/:slug` — the join page, then the lobby, then the room itself. */
 export default function RoomRoute() {
@@ -63,7 +65,13 @@ export default function RoomRoute() {
       </div>
     );
   }
-  if (publicInfo.error) return <NotFoundPage message="This room link is not valid." />;
+  if (publicInfo.error) {
+    return (
+      <Suspense fallback={null}>
+        <NotFoundPage message="This room link is not valid." />
+      </Suspense>
+    );
+  }
   const room = publicInfo.data;
   if (invite && !(membership.data && isInterviewerRole(membership.data.participant.role))) {
     if (room.status === 'ended') return <EndedNotice room={room} />;
