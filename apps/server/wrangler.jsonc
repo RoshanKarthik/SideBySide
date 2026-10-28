@@ -26,8 +26,9 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      // Replace with the id printed by `wrangler hyperdrive create` (see README).
-      "id": "00000000000000000000000000000000",
+      // The production database (Neon), from `wrangler hyperdrive create sidebyside-db`. Local
+      // development ignores it and uses CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE.
+      "id": "d0a115d2e3754d9bad4132662e3acf7b",
     },
   ],
   "vars": {

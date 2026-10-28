@@ -148,6 +148,7 @@ docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=
 | `pnpm db:generate` | New SQL migration from `packages/db/src/schema.ts` |
 | `pnpm db:migrate`  | Apply migrations to `DATABASE_URL`                 |
 | `pnpm db:seed`     | Load (or refresh) the public question bank         |
+| `pnpm db:*:ws`     | `migrate` / `seed` for Neon over port 443          |
 
 To check page weight, `pnpm --filter @sidebyside/web size` builds the app and prints the
 gzipped JavaScript the room page needs before the code editor and whiteboard load (about 401 KB
@@ -191,6 +192,10 @@ each step. The tests are not part of `pnpm test`.
    DATABASE_URL="postgresql://…" pnpm db:migrate
    DATABASE_URL="postgresql://…" pnpm db:seed
    ```
+
+   If your network blocks Postgres's port 5432 (the commands time out), use
+   `pnpm db:migrate:ws` and `pnpm db:seed:ws` instead: they reach Neon over WebSockets on
+   port 443. The deployed app is unaffected, since Cloudflare connects to Neon itself.
 
 2. **Cloudflare.** Sign in and create a Hyperdrive config pointing at the production database:
 
