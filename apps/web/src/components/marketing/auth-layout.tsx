@@ -1,9 +1,14 @@
 import { CheckCircle2 } from 'lucide-react';
-import type { CSSProperties, ReactNode } from 'react';
+import { Suspense, lazy, type CSSProperties, type ReactNode } from 'react';
 import { Link } from '@/lib/navigation';
-import { Logo, ThemeToggle } from '@/components/layout';
-import { BackgroundVideo } from './cinematic-hero';
-import { RoomPreview } from './previews';
+import { Logo, ThemeToggle } from '@/components/logo';
+
+// Decoration for wide screens only, so it loads after the form (the join page is the first
+// thing a candidate opens).
+const BackgroundVideo = lazy(() =>
+  import('./cinematic-hero').then((m) => ({ default: m.BackgroundVideo })),
+);
+const RoomPreview = lazy(() => import('./previews').then((m) => ({ default: m.RoomPreview })));
 
 const POINTS = [
   'Video call, code editor, tests and whiteboard in one room',
@@ -51,12 +56,16 @@ export function AuthLayout({
       </div>
       {/* The landing hero's video, so moving between the two feels like one place. */}
       <div className="cinematic relative isolate hidden overflow-hidden lg:flex lg:flex-col lg:justify-center lg:px-14">
-        <BackgroundVideo />
+        <Suspense fallback={null}>
+          <BackgroundVideo />
+        </Suspense>
         <div aria-hidden className="absolute inset-0 z-0 bg-[hsl(201_100%_13%/0.35)]" />
         <div className="auth-float relative z-10">
           {aside ?? (
             <div className="mx-auto w-full max-w-lg">
-              <RoomPreview className="border-white/15 bg-black/35 backdrop-blur-md" />
+              <Suspense fallback={null}>
+                <RoomPreview className="border-white/15 bg-black/35 backdrop-blur-md" />
+              </Suspense>
               <ul className="liquid-glass mt-8 space-y-3 rounded-2xl p-5">
                 {POINTS.map((p) => (
                   <li key={p} className="flex items-start gap-3 text-sm text-foreground/90">

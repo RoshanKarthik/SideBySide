@@ -1,6 +1,6 @@
 import type { Brand } from '@sidebyside/shared';
 import type { CSSProperties } from 'react';
-import { LogoMark } from '@/components/layout';
+import { LogoMark } from '@/components/logo';
 import { cn, initials } from '@/lib/utils';
 
 /** The company's logo and name when the interviewer set them, otherwise SideBySide's. */

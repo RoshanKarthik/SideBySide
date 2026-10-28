@@ -1,26 +1,16 @@
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { Suspense, lazy } from 'react';
 import { cn } from '@/lib/utils';
 
-/**
- * Renders markdown from questions and reports. Raw HTML in the source is not rendered
- * (react-markdown escapes it), so authored content can't inject scripts.
- */
+// The parser is ~45 KB gzipped; the room page loads it only once a problem is shown.
+const MarkdownRenderer = lazy(() => import('./markdown-renderer'));
+
+/** Renders markdown from questions and reports, showing the plain text until the parser loads. */
 export function Markdown({ children, className }: { children: string; className?: string }) {
   return (
     <div className={cn('markdown', className)}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ href, children: text }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer nofollow">
-              {text}
-            </a>
-          ),
-        }}
-      >
-        {children}
-      </ReactMarkdown>
+      <Suspense fallback={<p className="whitespace-pre-wrap">{children}</p>}>
+        <MarkdownRenderer>{children}</MarkdownRenderer>
+      </Suspense>
     </div>
   );
 }

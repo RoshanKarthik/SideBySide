@@ -149,6 +149,11 @@ docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=
 | `pnpm db:migrate`  | Apply migrations to `DATABASE_URL`                 |
 | `pnpm db:seed`     | Load (or refresh) the public question bank         |
 
+To check page weight, `pnpm --filter @sidebyside/web size` builds the app and prints the
+gzipped JavaScript the room page needs before the code editor and whiteboard load (about 401 KB
+today, against a target of about 400 KB) and what every page needs (about 177 KB). The code
+editor, whiteboard, interviewer panel, markdown renderer and every other page load on demand.
+
 To run the daily retention cleanup by hand while `pnpm dev` is running:
 `curl "http://127.0.0.1:8787/cdn-cgi/local/scheduled"`.
 

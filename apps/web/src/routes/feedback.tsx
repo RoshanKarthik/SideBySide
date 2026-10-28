@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 import { useParams } from 'react-router';
 import { BrandMark, brandStyle } from '@/components/brand';
-import { ThemeToggle } from '@/components/layout';
+import { ThemeToggle } from '@/components/logo';
 import { Card, ErrorNote, Spinner } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { CandidateReportView, ReportBody, useReports } from '@/reports/ai-reports';
