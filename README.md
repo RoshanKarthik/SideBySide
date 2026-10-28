@@ -67,6 +67,53 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 Everything runs on free plans that don't need a card: Cloudflare Workers Free (including SQLite
 Durable Objects and Hyperdrive) and Neon Free.
 
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph browser["Browser · React app"]
+    pages["Dashboard, room, replay,<br/>question bank, practice"]
+    editors["Notes, code and whiteboard<br/>TipTap · Monaco · Excalidraw on Yjs"]
+    runner["Code runner Web Worker<br/>Pyodide · JavaScript · TypeScript"]
+    video["Video call<br/>WebRTC"]
+  end
+
+  subgraph cloudflare["Cloudflare Workers"]
+    worker["Worker<br/>static assets · Hono REST API · Better Auth"]
+    room["Room Durable Object<br/>one per room document<br/>Yjs sync · update log and snapshots in SQLite"]
+    matchmaker["Matchmaker Durable Object<br/>practice queue"]
+    cron["Cron Trigger<br/>daily retention cleanup"]
+    ai["Workers AI<br/>post-interview reports"]
+    hyperdrive["Hyperdrive<br/>pooled Postgres connections"]
+  end
+
+  postgres[("Neon Postgres<br/>users · rooms · participants · events<br/>questions · code runs · reports")]
+  oauth["Google and GitHub sign-in"]
+
+  pages -- "HTTPS /api" --> worker
+  editors <-- "WebSocket /collab" --> room
+  runner -. "run and test results" .-> room
+  video <-. "signalling only" .-> room
+  worker --> room
+  worker --> matchmaker
+  worker <--> oauth
+  cron --> worker
+  room -- "report job" --> ai
+  worker --> hyperdrive
+  room --> hyperdrive
+  hyperdrive --> postgres
+```
+
+- **Realtime:** each room document (shared, interviewer-only, and one pair per practice round)
+  is its own Durable Object. It merges Yjs updates from every browser, stamps them with server
+  time for replay, and enforces who may connect, so candidates never receive private data.
+- **Code execution:** code runs in a locked-down Web Worker in the browser, not on a server.
+  Hidden tests run in the interviewer's browser and only pass/fail results reach the candidate.
+- **Video:** audio and video go peer to peer between browsers; the room only relays the
+  connection setup.
+- **Background work:** the Cron Trigger deletes rooms past their retention date, and when a
+  session ends the room writes the AI reports with Workers AI.
+
 ## Repository layout
 
 ```
