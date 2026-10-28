@@ -148,6 +148,7 @@ docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=
 | `pnpm db:generate` | New SQL migration from `packages/db/src/schema.ts` |
 | `pnpm db:migrate`  | Apply migrations to `DATABASE_URL`                 |
 | `pnpm db:seed`     | Load (or refresh) the public question bank         |
+| `pnpm db:*:ws`     | `migrate` / `seed` for Neon over port 443          |
 
 To check page weight, `pnpm --filter @sidebyside/web size` builds the app and prints the
 gzipped JavaScript the room page needs before the code editor and whiteboard load (about 401 KB
@@ -192,6 +193,10 @@ each step. The tests are not part of `pnpm test`.
    DATABASE_URL="postgresql://…" pnpm db:seed
    ```
 
+   If your network blocks Postgres's port 5432 (the commands time out), use
+   `pnpm db:migrate:ws` and `pnpm db:seed:ws` instead: they reach Neon over WebSockets on
+   port 443. The deployed app is unaffected, since Cloudflare connects to Neon itself.
+
 2. **Cloudflare.** Sign in and create a Hyperdrive config pointing at the production database:
 
    ```bash
@@ -206,14 +211,16 @@ each step. The tests are not part of `pnpm test`.
    `https://<your-app>/api/auth/callback/google` (Google Cloud console) and
    `https://<your-app>/api/auth/callback/github` (GitHub → Settings → Developer settings).
 
-4. **Secrets.** From `apps/server`, set each one (you'll be prompted for the value):
+4. **Secrets.** After the first deploy, generate and store the two app secrets (the values are
+   never printed):
 
    ```bash
-   npx wrangler secret put BETTER_AUTH_SECRET
+   pnpm --filter @sidebyside/server secrets:init
    ```
 
-   Repeat for `GUEST_TOKEN_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`
-   and `GITHUB_CLIENT_SECRET`.
+   Then, from `apps/server`, set the sign-in app credentials (you'll be prompted for each value):
+   `npx wrangler secret put GOOGLE_CLIENT_ID`, and the same for `GOOGLE_CLIENT_SECRET`,
+   `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
 
 5. **AI reports (optional).** In the Cloudflare dashboard, create an API token with the
    **Workers AI: Read** permission and note your account id. From `apps/server`:
@@ -226,8 +233,10 @@ each step. The tests are not part of `pnpm test`.
    Then set `AI_SUMMARY_PROVIDER` to `"workers-ai"` in `wrangler.jsonc`. Leave it `"off"` to
    hide the feature. (`"sample"` shows fixed sample reports and is for local development only.)
 
-6. **App URL.** Set `PUBLIC_APP_URL` in `wrangler.jsonc` to the Worker's URL (for example
-   `https://sidebyside.<account>.workers.dev`). Keep `ALLOW_DEV_LOGIN` set to `"false"`.
+6. **App URL.** The `deploy` script in `apps/server/package.json` passes the production URL
+   (`https://sidebyside.roshankarrthik.workers.dev`) as `PUBLIC_APP_URL`; `wrangler.jsonc` keeps
+   the local one. Change it there if the address changes. Keep `ALLOW_DEV_LOGIN` set to
+   `"false"`.
 
 7. **Deploy:**
 
