@@ -5,6 +5,8 @@ Live technical interviews from one link. The interviewer and candidate share a r
 sharing. Every edit is recorded with a server timestamp, so the whole session can be
 **replayed** afterwards.
 
+**Live:** https://sidebyside.roshankarrthik.workers.dev
+
 - Interviewers sign in (Google or GitHub) and create a room.
 - Candidates open the link, enter their name, accept the recording notice and join. No account.
 - A lobby checks camera and microphone (with device pickers and a level meter) before anyone
