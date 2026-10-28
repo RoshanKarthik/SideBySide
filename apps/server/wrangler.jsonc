@@ -32,6 +32,7 @@
     },
   ],
   "vars": {
+    // Local development. `pnpm deploy` sets the production URL (apps/server/package.json).
     "PUBLIC_APP_URL": "http://localhost:5173",
     // Comma-separated extra origins allowed to call the API (e.g. a second local hostname).
     "TRUSTED_ORIGINS": "",

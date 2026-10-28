@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --var PUBLIC_APP_URL:https://sidebyside.roshankarrthik.workers.dev",
+    "secrets:init": "node scripts/init-secrets.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "cf-typegen": "wrangler types --strict-vars=false"
