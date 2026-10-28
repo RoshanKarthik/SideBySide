@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/overlay';
 import { toast } from '@/components/ui/toaster';
 import { api } from '@/lib/api';
+import { sessionRemoval } from '@/lib/remove-session';
 import { useSession } from '@/lib/auth-client';
 import { cn, formatDuration, timeAgo } from '@/lib/utils';
 
@@ -372,10 +373,11 @@ function RoomRow({ room }: { room: RoomListItem }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirm, setConfirm] = useState(false);
+  const removal = sessionRemoval(room, room.myRole === 'owner');
   const remove = useMutation({
-    mutationFn: () => api.send(`/rooms/${room.id}`, { method: 'DELETE' }),
+    mutationFn: () => api.send(removal.path, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Session deleted');
+      toast.success(removal.done);
       void queryClient.invalidateQueries({ queryKey: ['rooms'] });
     },
     onError: (e) => toast.error(e.message),
@@ -476,64 +478,51 @@ function RoomRow({ room }: { room: RoomListItem }) {
               <Link to={`/r/${room.slug}`}>{room.status === 'live' ? 'Rejoin' : 'Open'}</Link>
             </Button>
           )}
-          {(!candidate || open) && (
-            <Menu>
-              <MenuTrigger asChild>
-                <Button size="icon-sm" variant="ghost" aria-label={`More for ${room.title}`}>
-                  <MoreHorizontal />
-                </Button>
-              </MenuTrigger>
-              <MenuContent align="end">
-                {ended && (
-                  <>
-                    {!candidate && (
-                      <MenuItem onSelect={() => navigate(`/sessions/${room.id}`)}>
-                        <FileText /> Session summary
-                      </MenuItem>
-                    )}
-                    {feedback && (
-                      <MenuItem onSelect={() => navigate(feedback)}>
-                        <Sparkles /> Read feedback
-                      </MenuItem>
-                    )}
-                    {replay && (
-                      <MenuItem onSelect={() => navigate(`/rooms/${room.id}/replay`)}>
-                        <History /> Watch replay
-                      </MenuItem>
-                    )}
-                  </>
-                )}
-                {!ended && room.mode !== 'practice' && (
-                  <MenuItem
-                    onSelect={async () => {
-                      await navigator.clipboard.writeText(link);
-                      toast.success('Room link copied');
-                    }}
-                  >
-                    <Copy /> Copy candidate link
-                  </MenuItem>
-                )}
-                {room.myRole === 'owner' && (
-                  <>
-                    <MenuSeparator />
-                    <MenuItem
-                      destructive
-                      disabled={room.status === 'live'}
-                      onSelect={() => setConfirm(true)}
-                    >
-                      <Trash2 /> Delete session
+          <Menu>
+            <MenuTrigger asChild>
+              <Button size="icon-sm" variant="ghost" aria-label={`More for ${room.title}`}>
+                <MoreHorizontal />
+              </Button>
+            </MenuTrigger>
+            <MenuContent align="end">
+              {ended && (
+                <>
+                  {!candidate && (
+                    <MenuItem onSelect={() => navigate(`/sessions/${room.id}`)}>
+                      <FileText /> Session summary
                     </MenuItem>
-                  </>
-                )}
-              </MenuContent>
-            </Menu>
-          )}
+                  )}
+                  {feedback && (
+                    <MenuItem onSelect={() => navigate(feedback)}>
+                      <Sparkles /> Read feedback
+                    </MenuItem>
+                  )}
+                  {replay && (
+                    <MenuItem onSelect={() => navigate(`/rooms/${room.id}/replay`)}>
+                      <History /> Watch replay
+                    </MenuItem>
+                  )}
+                </>
+              )}
+              {!ended && room.mode !== 'practice' && (
+                <MenuItem
+                  onSelect={async () => {
+                    await navigator.clipboard.writeText(link);
+                    toast.success('Room link copied');
+                  }}
+                >
+                  <Copy /> Copy candidate link
+                </MenuItem>
+              )}
+              <MenuSeparator />
+              <MenuItem destructive onSelect={() => setConfirm(true)}>
+                <Trash2 /> {removal.menuLabel}
+              </MenuItem>
+            </MenuContent>
+          </Menu>
         </div>
         <Dialog open={confirm} onOpenChange={setConfirm}>
-          <DialogContent
-            title="Delete this session?"
-            description={`“${room.title}” and its replay, notes, code runs and rubric will be deleted for everyone. This can’t be undone.`}
-          >
+          <DialogContent title={removal.title} description={removal.description}>
             <div className="mt-6 flex justify-end gap-2">
               <DialogClose asChild>
                 <Button variant="ghost">Cancel</Button>
@@ -543,7 +532,7 @@ function RoomRow({ room }: { room: RoomListItem }) {
                 disabled={remove.isPending}
                 onClick={() => remove.mutate(undefined, { onSettled: () => setConfirm(false) })}
               >
-                {remove.isPending && <Spinner />} Delete
+                {remove.isPending && <Spinner />} {removal.action}
               </Button>
             </div>
           </DialogContent>

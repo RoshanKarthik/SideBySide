@@ -29,6 +29,9 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 - **Keep your feedback:** when the interviewer shares the replay or report, a guest candidate
   can save the ended session to an account (sign up or sign in) from the "Session ended" screen,
   then open their AI feedback and the replay (whichever were shared) from their dashboard.
+- **Deleting sessions:** the interviewer who owns a session can delete it for everyone at any
+  time. Anyone else (a practice partner, a co-interviewer, a candidate who saved it) removes it
+  from their own sessions; a practice session is deleted for good once both partners remove it.
 - **Retention:** each room is deleted for good once its retention period (7, 30 or 90 days
   after the session ends) is over. A daily Cron Trigger purges the room's Durable Object
   documents, then its Postgres rows.

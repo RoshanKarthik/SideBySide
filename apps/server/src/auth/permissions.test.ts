@@ -8,6 +8,7 @@ import {
   canJoinLive,
   canRate,
   canRecordRun,
+  canRemoveFromMySessions,
   canSeeEvent,
   canSwapRoles,
   canViewReplay,
@@ -57,6 +58,14 @@ describe('permissions', () => {
     expect(canClaimSession(guest, { ...room, mode: 'practice' })).toBe(false);
     expect(canClaimSession({ ...guest, userId: 'u1' }, room)).toBe(false);
     expect(canClaimSession({ role: 'interviewer', userId: null }, room)).toBe(false);
+  });
+
+  it('lets everyone signed in except the owner remove a session from their own list', () => {
+    expect(canRemoveFromMySessions({ role: 'peer', userId: 'u1' })).toBe(true);
+    expect(canRemoveFromMySessions({ role: 'interviewer', userId: 'u1' })).toBe(true);
+    expect(canRemoveFromMySessions({ role: 'candidate', userId: 'u1' })).toBe(true);
+    expect(canRemoveFromMySessions({ role: 'owner', userId: 'u1' })).toBe(false);
+    expect(canRemoveFromMySessions({ role: 'candidate', userId: null })).toBe(false);
   });
 
   it('filters interviewer-only events', () => {

@@ -55,8 +55,20 @@ export function canEndSession(role: RoomRole): boolean {
   return isInterviewerRole(role);
 }
 
+/** The owner deletes an interview for everyone, at any time (anyone connected is disconnected). */
 export function canDeleteRoom(role: RoomRole): boolean {
   return role === 'owner';
+}
+
+/**
+ * Everyone else with an account in a room (practice peers, co-interviewers, candidates who saved
+ * the session) can remove it from their own sessions; the others keep their copy.
+ */
+export function canRemoveFromMySessions(participant: {
+  role: RoomRole;
+  userId: string | null;
+}): boolean {
+  return participant.userId !== null && participant.role !== 'owner';
 }
 
 export function canUpdateRoomSettings(role: RoomRole): boolean {

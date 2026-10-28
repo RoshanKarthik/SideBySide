@@ -3,6 +3,8 @@ import {
   asc,
   eq,
   events,
+  isNotNull,
+  or,
   participants,
   practiceRatings,
   rooms,
@@ -20,6 +22,7 @@ import { findRoomById, resolveMembership } from '../auth/identity';
 import {
   canDeleteRoom,
   canRate,
+  canRemoveFromMySessions,
   canSwapRoles,
   canViewReplay,
   canViewSummary,
@@ -155,20 +158,69 @@ export function sessionRoutes(deps: AppDeps) {
       })),
       rounds: summaryRounds,
       canDelete: canDeleteRoom(participant.role),
+      canRemove: canRemoveFromMySessions(participant),
       canViewReplay: canViewReplay(participant.role, room),
     };
     return c.json(body);
   });
 
-  /** Deletes the room, its recordings and everything linked to it. Owner only. */
+  /**
+   * Deletes the room, its recordings and everything linked to it. Owner only, at any time: a room
+   * left live (everyone closed the tab) can be deleted too, and anyone connected is disconnected.
+   */
   app.delete('/rooms/:id', async (c) => {
     const { room, participant } = await requireMembership(c);
-    if (!canDeleteRoom(participant.role)) throw forbidden('Only the room owner can delete it');
-    if (room.status === 'live') {
-      throw conflict('End the session before deleting it', 'room_live');
+    if (!canDeleteRoom(participant.role)) {
+      throw forbidden('Only the room owner can delete it; remove it from your sessions instead');
     }
     await purgeRoomDocuments(deps, c.env, room.id, room.currentRound);
     await c.var.db.delete(rooms).where(eq(rooms.id, room.id));
+    return c.body(null, 204);
+  });
+
+  /**
+   * Removes the room from the caller's sessions without deleting it for the others: their seat is
+   * unlinked from their account and ratings involving them in this room are deleted. A practice
+   * room with nobody left who has an account is deleted for good.
+   */
+  app.delete('/rooms/:id/me', async (c) => {
+    const { room, participant } = await requireMembership(c);
+    if (!canRemoveFromMySessions(participant) || !participant.userId) {
+      throw forbidden(
+        participant.role === 'owner'
+          ? 'You own this session; delete it instead'
+          : 'Only signed-in participants can remove a session',
+      );
+    }
+    const userId = participant.userId;
+    const db = c.var.db;
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(practiceRatings)
+        .where(
+          and(
+            eq(practiceRatings.roomId, room.id),
+            or(eq(practiceRatings.fromUserId, userId), eq(practiceRatings.toUserId, userId)),
+          ),
+        );
+      await tx
+        .update(participants)
+        .set({ userId: null })
+        .where(eq(participants.id, participant.id));
+    });
+    if (room.mode === 'practice') {
+      const [partner] = await db
+        .select({ userId: participants.userId })
+        .from(participants)
+        .where(and(eq(participants.roomId, room.id), isNotNull(participants.userId)));
+      if (!partner?.userId) {
+        await purgeRoomDocuments(deps, c.env, room.id, room.currentRound);
+        await db.delete(rooms).where(eq(rooms.id, room.id));
+      } else if (room.ownerId === userId) {
+        // Practice rooms record one peer as owner (for retention); it passes to the partner.
+        await db.update(rooms).set({ ownerId: partner.userId }).where(eq(rooms.id, room.id));
+      }
+    }
     return c.body(null, 204);
   });
 

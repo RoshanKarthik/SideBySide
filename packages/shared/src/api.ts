@@ -234,6 +234,8 @@ export const sessionSummarySchema = z.object({
     }),
   ),
   canDelete: z.boolean(),
+  /** Remove the session from your own sessions without deleting it for the others. */
+  canRemove: z.boolean(),
   canViewReplay: z.boolean(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;

@@ -211,10 +211,8 @@ describe('sessions', () => {
     await h.json(`/api/rooms/${room.id}/summary`, { token: guest.collabToken! }, 403);
   });
 
-  it('refuses to delete a live room or someone else’s, then deletes everything', async () => {
+  it('refuses to delete someone else’s room, then deletes everything, even while live', async () => {
     await h.db.update(rooms).set({ status: 'live' }).where(eq(rooms.id, room.id));
-    await h.json(`/api/rooms/${room.id}`, { method: 'DELETE', cookie: owner }, 409);
-    await h.json(`/api/rooms/${room.id}/end`, { method: 'POST', cookie: owner });
     await h.json(`/api/rooms/${room.id}`, { method: 'DELETE', token: guest.collabToken! }, 403);
     const purges = h.roomRpc.purge.mock.calls.length;
     await h.json(`/api/rooms/${room.id}`, { method: 'DELETE', cookie: owner }, 204);

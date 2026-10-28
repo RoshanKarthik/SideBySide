@@ -1,5 +1,5 @@
 import { LANGUAGE_INFO, RUBRIC_SCORE_LABELS, type SessionSummary } from '@sidebyside/shared';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AppWindow,
   ArrowLeft,
@@ -29,6 +29,7 @@ import { Avatar, Dialog, DialogClose, DialogContent, DialogTrigger } from '@/com
 import { toast } from '@/components/ui/toaster';
 import { AiReports } from '@/reports/ai-reports';
 import { api } from '@/lib/api';
+import { sessionRemoval } from '@/lib/remove-session';
 import { useSession } from '@/lib/auth-client';
 import { cn, formatClock, formatDuration, timeAgo } from '@/lib/utils';
 
@@ -126,9 +127,7 @@ function SessionBody({ s }: { s: SessionSummary }) {
               <Link to={`/r/${s.room.slug}`}>Open room</Link>
             </Button>
           )}
-          {s.canDelete && s.room.status !== 'live' && (
-            <DeleteSession roomId={s.room.id} title={s.room.title} />
-          )}
+          {(s.canDelete || s.canRemove) && <DeleteSession room={s.room} owner={s.canDelete} />}
         </div>
       </div>
 
@@ -427,12 +426,16 @@ function Signals({ signals }: { signals: SessionSummary['rounds'][number]['signa
   );
 }
 
-function DeleteSession({ roomId, title }: { roomId: string; title: string }) {
+/** The owner deletes the session for everyone; anyone else removes it from their own sessions. */
+function DeleteSession({ room, owner }: { room: SessionSummary['room']; owner: boolean }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const removal = sessionRemoval(room, owner);
   const remove = useMutation({
-    mutationFn: () => api.send(`/rooms/${roomId}`, { method: 'DELETE' }),
+    mutationFn: () => api.send(removal.path, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Session deleted');
+      toast.success(removal.done);
+      void queryClient.invalidateQueries({ queryKey: ['rooms'] });
       navigate('/dashboard', { replace: true });
     },
   });
@@ -440,13 +443,10 @@ function DeleteSession({ roomId, title }: { roomId: string; title: string }) {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline">
-          <Trash2 /> Delete
+          <Trash2 /> {removal.action}
         </Button>
       </DialogTrigger>
-      <DialogContent
-        title="Delete this session?"
-        description={`“${title}” and its replay, notes, code runs and rubric will be deleted for everyone. This can’t be undone.`}
-      >
+      <DialogContent title={removal.title} description={removal.description}>
         {remove.error && (
           <div className="mt-4">
             <ErrorNote>{remove.error.message}</ErrorNote>
@@ -457,7 +457,7 @@ function DeleteSession({ roomId, title }: { roomId: string; title: string }) {
             <Button variant="ghost">Cancel</Button>
           </DialogClose>
           <Button variant="destructive" disabled={remove.isPending} onClick={() => remove.mutate()}>
-            {remove.isPending && <Spinner />} Delete
+            {remove.isPending && <Spinner />} {removal.action}
           </Button>
         </div>
       </DialogContent>
