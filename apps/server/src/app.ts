@@ -48,7 +48,7 @@ export function createApp(deps: AppDeps) {
   app.use('*', async (c, next) => {
     const handle = await deps.openDb(c.env);
     c.set('db', handle.db);
-    c.set('auth', createAuth(c.env, handle.db));
+    c.set('auth', createAuth(c.env, handle.db, deps.mailer(c.env)));
     try {
       await next();
     } finally {

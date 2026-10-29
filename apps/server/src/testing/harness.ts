@@ -3,6 +3,7 @@ import { createTestDb } from '@sidebyside/db/testing';
 import type { BoardFile, ExecuteRequest, RunOutput } from '@sidebyside/shared';
 import { expect, vi } from 'vitest';
 import { createApp } from '../app';
+import type { EmailMessage, Mailer } from '../email/mailer';
 import type { ExecutionProvider } from '../exec/provider';
 import type { AppDeps, BoardFileResult, MatchmakerRpc, RoomRpc } from '../context';
 import { MatchQueue } from '../practice/queue';
@@ -59,6 +60,13 @@ export async function createHarness(envOverrides: Record<string, string> = {}) {
       memoryKb: null,
     })),
   } satisfies ExecutionProvider;
+  // Sign-in emails, kept so tests can follow the link.
+  const sentEmails: EmailMessage[] = [];
+  const mailer = {
+    send: vi.fn(async (message: EmailMessage) => {
+      sentEmails.push(message);
+    }),
+  } satisfies Mailer;
   // The real queue logic, creating rooms in the test database.
   const queue = new MatchQueue((a, b, prefs) => createPracticeRoom(handle.db, a, b, prefs));
   const matchmaker: MatchmakerRpc = {
@@ -71,6 +79,7 @@ export async function createHarness(envOverrides: Record<string, string> = {}) {
     room: async () => roomRpc,
     matchmaker: async () => matchmaker,
     execution: () => (env.REMOTE_EXECUTION === 'off' ? null : execution),
+    mailer: () => mailer,
   };
   const app = createApp(deps);
 
@@ -110,6 +119,8 @@ export async function createHarness(envOverrides: Record<string, string> = {}) {
     db: handle.db,
     roomRpc,
     execution,
+    mailer,
+    sentEmails,
     queue,
     close: () => handle.close(),
   };

@@ -5,6 +5,8 @@ import { createApp } from './app';
 import { authorizeConnection } from './collab/connect';
 import type { Room } from './collab/room';
 import type { AppDeps } from './context';
+import { mailerFromEnv } from './email/mailer';
+import { forgetOldSignInEmails } from './email/sign-in-email';
 import { wandboxProvider } from './exec/wandbox';
 import { deleteExpiredRooms } from './jobs/retention';
 
@@ -20,6 +22,7 @@ const deps: AppDeps = {
     )) as unknown as DurableObjectStub<Room>,
   matchmaker: async (env) => env.Matchmaker.get(env.Matchmaker.idFromName('global')),
   execution: (env) => (env.REMOTE_EXECUTION === 'off' ? null : wandboxProvider()),
+  mailer: mailerFromEnv,
 };
 
 const api = createApp(deps);
@@ -61,11 +64,15 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  /** Hourly cron (see wrangler.jsonc): deletes rooms whose retention period is over. */
+  /**
+   * Hourly cron (see wrangler.jsonc): deletes rooms whose retention period is over, and the
+   * sign-in email records the rate limits no longer need.
+   */
   async scheduled(_controller, env, ctx): Promise<void> {
     const handle = await deps.openDb(env);
     try {
       const result = await deleteExpiredRooms(deps, env, handle.db);
+      await forgetOldSignInEmails(handle.db);
       console.log('Retention cleanup', result);
     } finally {
       ctx.waitUntil(handle.close().catch((e) => console.error('Failed to close db', e)));

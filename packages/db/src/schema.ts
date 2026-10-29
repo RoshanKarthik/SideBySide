@@ -332,6 +332,23 @@ export const rubricScores = pgTable(
   (t) => [uniqueIndex('rubric_scores_room_criterion_idx').on(t.roomId, t.roundNumber, t.criterion)],
 );
 
+/**
+ * Sign-in emails sent in the last day, by a hash of the address, to cap how many links anyone
+ * can have sent (the hourly cleanup deletes older rows).
+ */
+export const signInEmails = pgTable(
+  'sign_in_emails',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    emailHash: text('email_hash').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('sign_in_emails_hash_sent_idx').on(t.emailHash, t.sentAt),
+    index('sign_in_emails_sent_idx').on(t.sentAt),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // Practice mode (the matchmaking queue itself lives in the Matchmaker Durable Object)
 // ---------------------------------------------------------------------------

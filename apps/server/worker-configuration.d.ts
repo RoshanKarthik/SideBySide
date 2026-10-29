@@ -8,6 +8,10 @@ interface __BaseEnv_Env {
   AI_SUMMARY_PROVIDER: string;
   AI_MODEL: string;
   REMOTE_EXECUTION: string;
+  SMTP_HOST: string;
+  SMTP_PORT: string;
+  SMTP_USER: string;
+  SMTP_PASSWORD: string;
   GROQ_MODEL: string;
   GROQ_API_KEY: string;
   CLOUDFLARE_ACCOUNT_ID: string;
@@ -44,6 +48,10 @@ declare namespace NodeJS {
       | 'AI_SUMMARY_PROVIDER'
       | 'AI_MODEL'
       | 'REMOTE_EXECUTION'
+      | 'SMTP_HOST'
+      | 'SMTP_PORT'
+      | 'SMTP_USER'
+      | 'SMTP_PASSWORD'
       | 'GROQ_MODEL'
       | 'GROQ_API_KEY'
       | 'CLOUDFLARE_ACCOUNT_ID'

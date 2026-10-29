@@ -46,6 +46,10 @@
     "AI_MODEL": "",
     // Groq model id for the fallback; empty uses the default.
     "GROQ_MODEL": "",
+    // Email sign-in links go out through this SMTP server (a Gmail account by default) once the
+    // SMTP_USER and SMTP_PASSWORD (a Gmail App Password) secrets are set.
+    "SMTP_HOST": "smtp.gmail.com",
+    "SMTP_PORT": "465",
     // Java, C, C++ and Go run on Wandbox (wandbox.org, free and public): "wandbox" or "off".
     "REMOTE_EXECUTION": "wandbox",
   },

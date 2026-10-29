@@ -3,6 +3,7 @@ import type { BoardFile, Lang, PracticePrefs, QueueStatus } from '@sidebyside/sh
 import type { SharedProblem } from '@sidebyside/shared/doc';
 import type { Auth } from './auth/auth';
 import type { DocumentPart } from './auth/permissions';
+import type { Mailer } from './email/mailer';
 import type { ExecutionProvider } from './exec/provider';
 
 /** What routes need from the outside world; tests swap these for in-memory versions. */
@@ -12,6 +13,8 @@ export interface AppDeps {
   matchmaker(env: Env): Promise<MatchmakerRpc>;
   /** The server-side code runner for compiled languages, or null when it is turned off. */
   execution(env: Env): ExecutionProvider | null;
+  /** Sends sign-in links; null turns email sign-in off. */
+  mailer(env: Env): Mailer | null;
 }
 
 export interface Actor {

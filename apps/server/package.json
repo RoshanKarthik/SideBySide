@@ -19,6 +19,7 @@
     "lib0": "^0.2.119",
     "partyserver": "^0.5.10",
     "pg": "^8.23.1",
+    "worker-mailer": "1.2.1",
     "y-partyserver": "^2.2.0",
     "yjs": "^13.6.33",
     "zod": "^4.6.7"

@@ -29,7 +29,9 @@ export function meRoutes(deps: AppDeps) {
   const app = new Hono<AppEnv>();
 
   /** Which sign-in buttons the login page should show. */
-  app.get('/auth-providers', (c) => c.json({ providers: enabledProviders(c.env) }));
+  app.get('/auth-providers', (c) =>
+    c.json({ providers: enabledProviders(c.env, deps.mailer(c.env) !== null) }),
+  );
 
   app.get('/me', async (c) => {
     const session = await getSessionUser(c.var.auth, c.req.raw.headers);

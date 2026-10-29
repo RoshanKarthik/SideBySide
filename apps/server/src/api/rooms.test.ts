@@ -42,6 +42,7 @@ beforeAll(async () => {
       throw new Error('Not used in these tests');
     },
     execution: () => null,
+    mailer: () => null,
   };
   app = createApp(deps);
 });

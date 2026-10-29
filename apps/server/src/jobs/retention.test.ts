@@ -38,6 +38,7 @@ const deps: AppDeps = {
     throw new Error('Not used in these tests');
   },
   execution: () => null,
+  mailer: () => null,
 };
 
 /** An ended room with a candidate, events, a code run and rubric scores. */

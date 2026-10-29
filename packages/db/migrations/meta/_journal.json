@@ -43,6 +43,13 @@
       "when": 1792641269408,
       "tag": "0005_ai_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793255179957,
+      "tag": "0006_sign_in_emails",
+      "breakpoints": true
     }
   ]
 }
