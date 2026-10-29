@@ -38,7 +38,8 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 - **Retention:** each room is deleted for good once its retention period (7, 30 or 90 days
   after the session ends) is over. An hourly Cron Trigger purges the room's Durable Object
   documents, then its Postgres rows.
-- **AI post-interview reports** (Cloudflare Workers AI, free tier): when a session ends, a draft
+- **AI post-interview reports** (Cloudflare Workers AI free tier, with Groq taking over when its
+  daily allowance runs out): when a session ends, a draft
   report for the hiring team (approach, correctness, complexity, code quality, hints, key
   moments, neutral activity summary, suggested rubric scores, debrief questions) and a feedback
   report for the candidate. The candidate sees theirs only when the interviewer shared it, and
@@ -93,6 +94,9 @@ flowchart LR
     hyperdrive["Hyperdrive<br/>pooled Postgres connections"]
   end
 
+  wandbox["Wandbox<br/>runs Java · C · C++ · Go"]
+  groq["Groq<br/>report fallback"]
+
   postgres[("Neon Postgres<br/>users · rooms · participants · events<br/>questions · code runs · reports")]
   oauth["Google and GitHub sign-in"]
 
@@ -105,6 +109,8 @@ flowchart LR
   worker <--> oauth
   cron --> worker
   room -- "report job" --> ai
+  room -. "if Workers AI fails" .-> groq
+  worker -- "compiled languages" --> wandbox
   worker --> hyperdrive
   room --> hyperdrive
   hyperdrive --> postgres
@@ -113,12 +119,13 @@ flowchart LR
 - **Realtime:** each room document (shared, interviewer-only, and one pair per practice round)
   is its own Durable Object. It merges Yjs updates from every browser, stamps them with server
   time for replay, and enforces who may connect, so candidates never receive private data.
-- **Code execution:** code runs in a locked-down Web Worker in the browser, not on a server.
-  Hidden tests run in the interviewer's browser and only pass/fail results reach the candidate.
+- **Code execution:** Python, JavaScript and TypeScript run in a locked-down Web Worker in the
+  browser; Java, C, C++ and Go are compiled and run on Wandbox, called through the Worker. Hidden
+  tests run from the interviewer's browser and only pass/fail results reach the candidate.
 - **Video:** audio and video go peer to peer between browsers; the room only relays the
   connection setup.
 - **Background work:** the Cron Trigger deletes rooms past their retention date, and when a
-  session ends the room writes the AI reports with Workers AI.
+  session ends the room writes the AI reports with Workers AI (Groq when that fails).
 
 ## Repository layout
 
@@ -280,15 +287,19 @@ each step. The tests are not part of `pnpm test`.
    `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
 
 5. **AI reports (optional).** In the Cloudflare dashboard, create an API token with the
-   **Workers AI: Read** permission and note your account id. From `apps/server`:
+   **Workers AI: Read** permission and note your account id. For a fallback when the Workers AI
+   daily allowance runs out, also create a free API key at console.groq.com. From
+   `apps/server`:
 
    ```bash
    npx wrangler secret put CLOUDFLARE_ACCOUNT_ID
    npx wrangler secret put CLOUDFLARE_AI_TOKEN
+   npx wrangler secret put GROQ_API_KEY
    ```
 
-   Then set `AI_SUMMARY_PROVIDER` to `"workers-ai"` in `wrangler.jsonc`. Leave it `"off"` to
-   hide the feature. (`"sample"` shows fixed sample reports and is for local development only.)
+   `AI_SUMMARY_PROVIDER` in `wrangler.jsonc` is `"workers-ai"`; reports stay off until the
+   Workers AI secrets are set (or use `"groq"` with only the Groq key). Set it to `"off"` to hide
+   the feature. (`"sample"` shows fixed sample reports and is for local development only.)
 
    **TURN relay for calls (optional, recommended).** In the Cloudflare dashboard, open
    Realtime → TURN Server and create a TURN key (1,000 GB a month free), then from
@@ -364,8 +375,9 @@ each step. The tests are not part of `pnpm test`.
 - Calls are a mesh, so they suit interviews of two to four people, not large meetings. Without
   a TURN key (see Deploying), strict networks that block direct routes can't connect calls.
 - AI reports use the Workers AI free allocation (about 10,000 neurons a day, roughly a dozen
-  sessions' reports). Beyond that, reports fail with a quota message until the next day and can
-  be regenerated then.
+  sessions' reports). Beyond that, Groq writes them if `GROQ_API_KEY` is set (its free tier has
+  its own daily limits); otherwise they fail with a quota message and can be regenerated the
+  next day.
 - Sign-in by email link isn't available (it needs an email sender and a domain).
 - Retention cleanup runs every hour and deletes at most 100 rooms per run, so a room can
   outlive its `delete_after` date by up to an hour (longer only with a backlog of over 100
