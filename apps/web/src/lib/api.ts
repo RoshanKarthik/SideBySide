@@ -17,6 +17,8 @@ interface RequestOptions {
   /** Room whose guest token (if any) should authenticate this request. */
   roomKey?: string;
   signal?: AbortSignal;
+  /** Lets the request finish after the page closes. */
+  keepalive?: boolean;
 }
 
 async function request(path: string, opts: RequestOptions = {}): Promise<Response> {
@@ -30,6 +32,7 @@ async function request(path: string, opts: RequestOptions = {}): Promise<Respons
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
     credentials: 'same-origin',
     signal: opts.signal,
+    keepalive: opts.keepalive,
   });
   if (!res.ok) {
     let code = 'http_error';

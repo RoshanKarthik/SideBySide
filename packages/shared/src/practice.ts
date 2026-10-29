@@ -25,8 +25,11 @@ export type PracticePrefs = z.infer<typeof practicePrefsSchema>;
 export const PRACTICE_FALLBACK_MS = 45_000;
 /** After this long, the page offers to keep waiting or practise solo. */
 export const PRACTICE_GIVE_UP_HINT_MS = 120_000;
-/** Queue entries that stop polling for this long are dropped. */
-export const PRACTICE_STALE_MS = 30_000;
+/**
+ * Queue entries that stop polling for this long are dropped. Generous, because browsers can
+ * slow a background tab's polling to about once a minute; closing the page leaves at once.
+ */
+export const PRACTICE_STALE_MS = 2 * 60_000;
 
 export const queueStatusSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('idle') }),

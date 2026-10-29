@@ -23,6 +23,21 @@ describe('MatchQueue', () => {
     });
   });
 
+  it('keeps a background tab that checks in once a minute, and drops one that went quiet', async () => {
+    const queue = new MatchQueue(async () => ({ roomSlug: 'unused' }));
+    await queue.enqueue({ id: 'ravi', name: 'Ravi' }, prefs, 0);
+    await queue.enqueue({ id: 'meera', name: 'Meera' }, { ...prefs, language: 'java' }, 0);
+
+    // The matchmaker sweeps every 5 seconds. Ravi's tab is in the background and polls once a
+    // minute; Meera's page was closed.
+    for (let now = 5_000; now <= 180_000; now += 5_000) {
+      if (now % 60_000 === 0) queue.status('ravi', now);
+      await queue.sweep(now);
+    }
+    expect(queue.status('ravi', 181_000).status).toBe('waiting');
+    expect(queue.status('meera', 181_000).status).toBe('idle');
+  });
+
   it('puts both back in the queue when the room cannot be created', async () => {
     let fail: (e: Error) => void = () => {};
     const queue = new MatchQueue(() => new Promise<MatchResult>((_, reject) => (fail = reject)));

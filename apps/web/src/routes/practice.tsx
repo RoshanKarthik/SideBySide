@@ -39,22 +39,47 @@ const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 export default function PracticePage() {
   const { data: session, isPending } = useSession();
   const queryClient = useQueryClient();
+  // The choices of someone the server dropped from the queue, to explain it and offer them again.
+  const [dropped, setDropped] = useState<PracticePrefs | null>(null);
   const status = useQuery({
     queryKey: ['practice-status'],
-    queryFn: () => api.json<QueueStatus>('/practice/queue/status'),
+    queryFn: async () => {
+      const next = await api.json<QueueStatus>('/practice/queue/status');
+      const previous = queryClient.getQueryData<QueueStatus>(['practice-status']);
+      // Leaving on purpose sets "idle" directly, so this is the server dropping us.
+      if (previous?.status === 'waiting' && next.status === 'idle') setDropped(previous.prefs);
+      return next;
+    },
     enabled: !!session,
-    // Polling is also the heartbeat that keeps us in the queue.
+    // Polling is also the heartbeat that keeps us in the queue, so it goes on in a background tab.
     refetchInterval: (q) => (q.state.data?.status === 'waiting' ? 2500 : false),
+    refetchIntervalInBackground: true,
   });
   const join = useMutation({
     mutationFn: (prefs: PracticePrefs) =>
       api.json<QueueStatus>('/practice/queue', { method: 'POST', body: prefs }),
-    onSuccess: (s) => queryClient.setQueryData(['practice-status'], s),
+    onSuccess: (s) => {
+      setDropped(null);
+      queryClient.setQueryData(['practice-status'], s);
+    },
   });
   const leave = useMutation({
+    // A poll still in flight would put "waiting" back after we leave.
+    onMutate: () => queryClient.cancelQueries({ queryKey: ['practice-status'] }),
     mutationFn: () => api.send('/practice/queue', { method: 'DELETE' }),
     onSuccess: () => queryClient.setQueryData(['practice-status'], { status: 'idle' }),
   });
+
+  const waiting = status.data?.status === 'waiting';
+  useEffect(() => {
+    if (!waiting) return;
+    // Closing or reloading the page leaves the queue at once, so nobody is matched with it.
+    const leaveNow = () => {
+      api.send('/practice/queue', { method: 'DELETE', keepalive: true }).catch(() => {});
+    };
+    window.addEventListener('pagehide', leaveNow);
+    return () => window.removeEventListener('pagehide', leaveNow);
+  }, [waiting]);
 
   if (isPending) return null;
   if (!session) return <Navigate to="/login?next=/practice" replace />;
@@ -73,9 +98,20 @@ export default function PracticePage() {
         {s?.status === 'waiting' && (
           <Waiting status={s} onCancel={() => leave.mutate()} cancelling={leave.isPending} />
         )}
+        {s?.status === 'idle' && dropped && (
+          <p
+            role="status"
+            className="mt-8 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm"
+          >
+            You were taken out of the queue because this page stopped checking in for a while, for
+            example when the computer slept or lost its connection. Your choices are still selected:
+            click <strong>Find a partner</strong> to keep looking.
+          </p>
+        )}
         {s?.status === 'idle' && (
           <div className="stagger mt-8 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
             <PreferencesCard
+              initial={dropped}
               busy={join.isPending}
               error={join.error?.message}
               onStart={(p) => join.mutate(p)}
@@ -89,18 +125,20 @@ export default function PracticePage() {
 }
 
 function PreferencesCard({
+  initial,
   busy,
   error,
   onStart,
 }: {
+  initial: PracticePrefs | null;
   busy: boolean;
   error?: string;
   onStart: (prefs: PracticePrefs) => void;
 }) {
   const me = useMe();
-  const [topic, setTopic] = useState<PracticeTopic>('mixed');
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  const [language, setLanguage] = useState<Lang | null>(null);
+  const [topic, setTopic] = useState<PracticeTopic>(initial?.topic ?? 'mixed');
+  const [difficulty, setDifficulty] = useState<Difficulty>(initial?.difficulty ?? 'medium');
+  const [language, setLanguage] = useState<Lang | null>(initial?.language ?? null);
   const lang = language ?? me.data?.defaultLanguage ?? 'python';
 
   return (
@@ -201,6 +239,7 @@ function Waiting({
   cancelling: boolean;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -208,6 +247,7 @@ function Waiting({
   }, []);
   const waited = now - status.enqueuedAt;
   const solo = useMutation({
+    onMutate: () => queryClient.cancelQueries({ queryKey: ['practice-status'] }),
     mutationFn: async () => {
       await api.send('/practice/queue', { method: 'DELETE' });
       return api.json<CreateRoomResponse>('/rooms', {
@@ -272,8 +312,26 @@ function Waiting({
   );
 }
 
+let titleBeforeAlert: string | null = null;
+
+/** Shows `title` on the browser tab while it's in the background, until the person returns. */
+function titleUntilSeen(title: string) {
+  if (!document.hidden) return;
+  titleBeforeAlert ??= document.title;
+  document.title = title;
+  document.addEventListener('visibilitychange', restoreTitle);
+}
+
+function restoreTitle() {
+  if (document.hidden || titleBeforeAlert === null) return;
+  document.title = titleBeforeAlert;
+  titleBeforeAlert = null;
+  document.removeEventListener('visibilitychange', restoreTitle);
+}
+
 function Matched({ slug, partner }: { slug: string; partner: string }) {
   const navigate = useNavigate();
+  useEffect(() => titleUntilSeen(`Matched with ${partner} · SideBySide`), [partner]);
   useEffect(() => {
     const id = setTimeout(() => navigate(`/r/${slug}`), 1800);
     return () => clearTimeout(id);
