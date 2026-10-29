@@ -29,6 +29,11 @@ export function PrivacyPage() {
         IP addresses. Sessions are deleted automatically after the retention period the interviewer
         picked (7, 30 or 90 days), and the interviewer can delete a session at any time.
       </p>
+      <p>
+        Python, JavaScript and TypeScript run in your browser. Java, C, C++ and Go are compiled and
+        run by Wandbox (wandbox.org), a free public code-running service: when you run code in one
+        of those languages, the code and its input are sent there to produce the output.
+      </p>
     </LegalPage>
   );
 }

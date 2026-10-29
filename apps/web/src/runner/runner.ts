@@ -1,4 +1,11 @@
-import { LIMITS, isRunnable, type Lang, type RunOutput } from '@sidebyside/shared';
+import {
+  LIMITS,
+  isRunnable,
+  runsOnServer,
+  type ExecuteRequest,
+  type Lang,
+  type RunOutput,
+} from '@sidebyside/shared';
 import type { RunRequest, RunnerMessage } from './protocol';
 
 export type RunPhase = 'loading' | 'running';
@@ -15,13 +22,19 @@ const result = (status: RunOutput['status'], stderr: string): RunOutput => ({
   memoryKb: null,
 });
 
+/** Runs compiled languages on the server's code runner (see `serverRunner`). */
+export type RemoteRunner = (req: ExecuteRequest) => Promise<RunOutput>;
+
 /**
  * Runs code in a sandboxed worker, one run at a time. A run that exceeds the time limit kills
- * the worker (the only way to stop an infinite loop); the next run starts a fresh one.
+ * the worker (the only way to stop an infinite loop); the next run starts a fresh one. Compiled
+ * languages go to the server's code runner instead, when one is given.
  */
 export class CodeRunner {
   private worker: Worker | null = null;
   private busy = false;
+
+  constructor(private readonly remote?: RemoteRunner) {}
 
   get isBusy(): boolean {
     return this.busy;
@@ -39,6 +52,13 @@ export class CodeRunner {
     if (this.busy) return result('error', 'A run is already in progress.');
     this.busy = true;
     try {
+      if (runsOnServer(language)) {
+        if (!this.remote) return result('unsupported', 'This language runs only inside a room.');
+        onPhase?.('running');
+        return await this.remote({ language, source, stdin }).catch((err: Error) =>
+          result('error', err.message),
+        );
+      }
       return await this.execute(
         { type: 'run', id: crypto.randomUUID(), language, source, stdin },
         onPhase,

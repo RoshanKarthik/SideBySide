@@ -7,6 +7,7 @@ interface __BaseEnv_Env {
   PUBLIC_APP_URL: string;
   AI_SUMMARY_PROVIDER: string;
   AI_MODEL: string;
+  REMOTE_EXECUTION: string;
   BETTER_AUTH_SECRET: string;
   GUEST_TOKEN_SECRET: string;
   GOOGLE_CLIENT_ID: string;
@@ -36,6 +37,7 @@ declare namespace NodeJS {
       | 'PUBLIC_APP_URL'
       | 'AI_SUMMARY_PROVIDER'
       | 'AI_MODEL'
+      | 'REMOTE_EXECUTION'
       | 'BETTER_AUTH_SECRET'
       | 'GUEST_TOKEN_SECRET'
       | 'GOOGLE_CLIENT_ID'

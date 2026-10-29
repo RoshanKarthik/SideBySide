@@ -17,8 +17,11 @@ export interface LanguageInfo {
   label: string;
   /** Monaco language id. */
   monacoId: string;
-  /** Whether the in-browser runner can execute this language. */
-  runnable: boolean;
+  /**
+   * Where code in this language runs: in the browser's sandboxed worker, on the server's code
+   * runner (compiled languages), or nowhere (edit only).
+   */
+  runsOn: 'browser' | 'server' | null;
   /** Rendered live in a sandboxed preview frame instead of being run. */
   preview?: boolean;
   starter: string;
@@ -28,53 +31,53 @@ export const LANGUAGE_INFO: Record<Lang, LanguageInfo> = {
   python: {
     label: 'Python 3',
     monacoId: 'python',
-    runnable: true,
+    runsOn: 'browser',
     starter: 'def main():\n    name = input()\n    print(f"Hello, {name}!")\n\n\nmain()\n',
   },
   javascript: {
     label: 'JavaScript',
     monacoId: 'javascript',
-    runnable: true,
+    runsOn: 'browser',
     starter: 'const name = input();\nconsole.log(`Hello, ${name}!`);\n',
   },
   typescript: {
     label: 'TypeScript',
     monacoId: 'typescript',
-    runnable: true,
+    runsOn: 'browser',
     starter: 'const name: string = input();\nconsole.log(`Hello, ${name}!`);\n',
   },
   java: {
     label: 'Java',
     monacoId: 'java',
-    runnable: false,
+    runsOn: 'server',
     starter:
       'import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        System.out.println("Hello, " + sc.nextLine() + "!");\n    }\n}\n',
   },
   cpp: {
     label: 'C++',
     monacoId: 'cpp',
-    runnable: false,
+    runsOn: 'server',
     starter:
       '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    string name;\n    getline(cin, name);\n    cout << "Hello, " << name << "!" << endl;\n}\n',
   },
   c: {
     label: 'C',
     monacoId: 'c',
-    runnable: false,
+    runsOn: 'server',
     starter:
       '#include <stdio.h>\n\nint main(void) {\n    char name[256];\n    if (fgets(name, sizeof name, stdin)) printf("Hello, %s", name);\n    return 0;\n}\n',
   },
   go: {
     label: 'Go',
     monacoId: 'go',
-    runnable: false,
+    runsOn: 'server',
     starter:
       'package main\n\nimport (\n\t"bufio"\n\t"fmt"\n\t"os"\n)\n\nfunc main() {\n\tname, _ := bufio.NewReader(os.Stdin).ReadString(\'\n\')\n\tfmt.Printf("Hello, %s", name)\n}\n',
   },
   html: {
     label: 'HTML / CSS / JS',
     monacoId: 'html',
-    runnable: false,
+    runsOn: null,
     preview: true,
     starter: `<!doctype html>
 <html>
@@ -102,7 +105,12 @@ export const LANGUAGE_INFO: Record<Lang, LanguageInfo> = {
 };
 
 export function isRunnable(lang: Lang): boolean {
-  return LANGUAGE_INFO[lang].runnable;
+  return LANGUAGE_INFO[lang].runsOn !== null;
+}
+
+/** Compiled languages run on the server's code runner rather than in the browser. */
+export function runsOnServer(lang: Lang): boolean {
+  return LANGUAGE_INFO[lang].runsOn === 'server';
 }
 
 /** Front-end code that renders in a live preview instead of running. */

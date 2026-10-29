@@ -5,6 +5,7 @@ import { createApp } from './app';
 import { authorizeConnection } from './collab/connect';
 import type { Room } from './collab/room';
 import type { AppDeps } from './context';
+import { wandboxProvider } from './exec/wandbox';
 import { deleteExpiredRooms } from './jobs/retention';
 
 export { Room } from './collab/room';
@@ -18,6 +19,7 @@ const deps: AppDeps = {
       roomDocumentName(roomId, part, round),
     )) as unknown as DurableObjectStub<Room>,
   matchmaker: async (env) => env.Matchmaker.get(env.Matchmaker.idFromName('global')),
+  execution: (env) => (env.REMOTE_EXECUTION === 'off' ? null : wandboxProvider()),
 };
 
 const api = createApp(deps);

@@ -256,3 +256,11 @@ export const boardFileSchema = z
     path: ['dataURL'],
   });
 export type BoardFile = z.infer<typeof boardFileSchema>;
+
+/** Runs code on the server's code runner (compiled languages; see `runsOnServer`). */
+export const executeRequestSchema = z.object({
+  language: langSchema,
+  source: z.string().max(LIMITS.sourceBytes, 'The code is too long'),
+  stdin: z.string().max(LIMITS.stdinBytes, 'The input is too long'),
+});
+export type ExecuteRequest = z.infer<typeof executeRequestSchema>;

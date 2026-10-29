@@ -36,10 +36,12 @@ beforeAll(async () => {
       generateReports: async () => {},
       putBoardFile: async () => 'stored',
       getBoardFile: async () => null,
+      allowExecution: async () => 'ok',
     }),
     matchmaker: async () => {
       throw new Error('Not used in these tests');
     },
+    execution: () => null,
   };
   app = createApp(deps);
 });

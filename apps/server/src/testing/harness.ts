@@ -1,8 +1,9 @@
 import type { DbHandle } from '@sidebyside/db';
 import { createTestDb } from '@sidebyside/db/testing';
-import type { BoardFile } from '@sidebyside/shared';
+import type { BoardFile, ExecuteRequest, RunOutput } from '@sidebyside/shared';
 import { expect, vi } from 'vitest';
 import { createApp } from '../app';
+import type { ExecutionProvider } from '../exec/provider';
 import type { AppDeps, BoardFileResult, MatchmakerRpc, RoomRpc } from '../context';
 import { MatchQueue } from '../practice/queue';
 import { createPracticeRoom } from '../practice/rooms';
@@ -45,7 +46,19 @@ export async function createHarness(envOverrides: Record<string, string> = {}) {
       return 'stored';
     }),
     getBoardFile: vi.fn(async (id: string) => boardFiles.get(id) ?? null),
+    allowExecution: vi.fn(async (): Promise<'ok' | 'ended' | 'limited'> => 'ok'),
   } satisfies RoomRpc;
+  // The server-side code runner, answering every run with its stdin echoed back.
+  const execution = {
+    run: vi.fn(async (req: ExecuteRequest): Promise<RunOutput> => ({
+      status: 'ok',
+      stdout: req.stdin,
+      stderr: '',
+      exitCode: 0,
+      timeMs: 5,
+      memoryKb: null,
+    })),
+  } satisfies ExecutionProvider;
   // The real queue logic, creating rooms in the test database.
   const queue = new MatchQueue((a, b, prefs) => createPracticeRoom(handle.db, a, b, prefs));
   const matchmaker: MatchmakerRpc = {
@@ -57,6 +70,7 @@ export async function createHarness(envOverrides: Record<string, string> = {}) {
     openDb: async () => ({ db: handle.db, close: async () => {} }),
     room: async () => roomRpc,
     matchmaker: async () => matchmaker,
+    execution: () => (env.REMOTE_EXECUTION === 'off' ? null : execution),
   };
   const app = createApp(deps);
 
@@ -95,6 +109,7 @@ export async function createHarness(envOverrides: Record<string, string> = {}) {
     signUp,
     db: handle.db,
     roomRpc,
+    execution,
     queue,
     close: () => handle.close(),
   };

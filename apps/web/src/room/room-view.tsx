@@ -288,7 +288,13 @@ export function RoomView({
                   </div>
                 }
               >
-                <CodePanel conn={conn} participant={participant} interviewer={interviewer} />
+                <CodePanel
+                  conn={conn}
+                  participant={participant}
+                  interviewer={interviewer}
+                  roomId={room.id}
+                  slug={slug}
+                />
               </Suspense>
             </section>
           )}

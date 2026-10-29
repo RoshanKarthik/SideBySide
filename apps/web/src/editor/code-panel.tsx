@@ -4,6 +4,7 @@ import {
   LIMITS,
   hasPreview,
   isRunnable,
+  runsOnServer,
   type Lang,
   type Participant,
   type SharedRun,
@@ -38,6 +39,7 @@ import { reportPaste } from '@/room/integrity';
 import { ProblemPanel } from '@/room/problem-panel';
 import type { RoomConnection } from '@/room/use-room';
 import { CodeRunner, type RunPhase } from '@/runner/runner';
+import { serverRunner } from '@/runner/server-run';
 import { monaco, monacoTheme } from './monaco';
 import { PreviewPane } from './preview-pane';
 import { remoteCursorCss } from './remote-cursors';
@@ -47,10 +49,15 @@ export default function CodePanel({
   conn,
   participant,
   interviewer,
+  roomId,
+  slug,
 }: {
   conn: RoomConnection;
   participant: Participant;
   interviewer: boolean;
+  roomId: string;
+  /** Room slug: the key for a guest's token. */
+  slug: string;
 }) {
   useDocVersion(conn.doc);
   const language = readActiveLanguage(conn.doc);
@@ -158,7 +165,7 @@ export default function CodePanel({
           {LANGUAGES.map((l) => (
             <option key={l} value={l}>
               {LANGUAGE_INFO[l].label}
-              {LANGUAGE_INFO[l].runnable ? '' : hasPreview(l) ? ' (live preview)' : ' (edit only)'}
+              {LANGUAGE_INFO[l].runsOn ? '' : hasPreview(l) ? ' (live preview)' : ' (edit only)'}
             </option>
           ))}
         </NativeSelect>
@@ -186,7 +193,15 @@ export default function CodePanel({
         )}
         <span className="flex-1" />
         {!preview && <RunTestsButton conn={conn} language={language} />}
-        {!preview && <RunControls conn={conn} participant={participant} language={language} />}
+        {!preview && (
+          <RunControls
+            conn={conn}
+            participant={participant}
+            language={language}
+            roomId={roomId}
+            slug={slug}
+          />
+        )}
       </div>
       <div className={cn('min-h-0 flex-1', preview && 'grid grid-cols-2 max-md:grid-cols-1')}>
         <div className="relative h-full min-h-0">
@@ -205,12 +220,16 @@ function RunControls({
   conn,
   participant,
   language,
+  roomId,
+  slug,
 }: {
   conn: RoomConnection;
   participant: Participant;
   language: Lang;
+  roomId: string;
+  slug: string;
 }) {
-  const runner = useMemo(() => new CodeRunner(), []);
+  const runner = useMemo(() => new CodeRunner(serverRunner(roomId, slug)), [roomId, slug]);
   const [phase, setPhase] = useState<RunPhase | null>(null);
   useEffect(() => () => runner.dispose(), [runner]);
 
@@ -255,13 +274,21 @@ function RunControls({
       onClick={run}
       disabled={!runnable || phase !== null}
       title={
-        runnable
-          ? 'Run the code'
-          : `${LANGUAGE_INFO[language].label} can be edited but not run in the browser yet`
+        !runnable
+          ? `${LANGUAGE_INFO[language].label} can be edited but not run`
+          : runsOnServer(language)
+            ? 'Compile and run the code on the code runner (takes a few seconds)'
+            : 'Run the code'
       }
     >
       {phase ? <Loader2 className="animate-spin" /> : <Play />}
-      {phase === 'loading' ? 'Loading Python…' : phase === 'running' ? 'Running…' : 'Run'}
+      {phase === 'loading'
+        ? 'Loading Python…'
+        : phase === 'running'
+          ? runsOnServer(language)
+            ? 'Compiling and running…'
+            : 'Running…'
+          : 'Run'}
     </Button>
   );
 }

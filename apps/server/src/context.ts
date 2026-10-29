@@ -3,12 +3,15 @@ import type { BoardFile, Lang, PracticePrefs, QueueStatus } from '@sidebyside/sh
 import type { SharedProblem } from '@sidebyside/shared/doc';
 import type { Auth } from './auth/auth';
 import type { DocumentPart } from './auth/permissions';
+import type { ExecutionProvider } from './exec/provider';
 
 /** What routes need from the outside world; tests swap these for in-memory versions. */
 export interface AppDeps {
   openDb(env: Env): Promise<DbHandle>;
   room(env: Env, roomId: string, part?: DocumentPart, round?: number): Promise<RoomRpc>;
   matchmaker(env: Env): Promise<MatchmakerRpc>;
+  /** The server-side code runner for compiled languages, or null when it is turned off. */
+  execution(env: Env): ExecutionProvider | null;
 }
 
 export interface Actor {
@@ -35,6 +38,8 @@ export interface RoomRpc {
    */
   putBoardFile(file: BoardFile, fromInterviewer: boolean): Promise<BoardFileResult>;
   getBoardFile(id: string): Promise<BoardFile | null>;
+  /** Whether this participant may run code on the server now (live room, per-minute limit). */
+  allowExecution(participantId: string): Promise<'ok' | 'ended' | 'limited'>;
 }
 
 export type BoardFileResult = 'stored' | 'ended' | 'locked' | 'full';

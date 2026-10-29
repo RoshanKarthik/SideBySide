@@ -98,6 +98,12 @@ function callIdOf(connection: Connection): string | undefined {
 }
 
 /** Sliding one-minute window rate limiter, per key. */
+/**
+ * Runs (and test cases) a participant may send to the server-side code runner per minute: it is
+ * a free public service, so the room keeps its use modest.
+ */
+const SERVER_RUNS_PER_MINUTE = 20;
+
 class MinuteLimiter {
   private hits = new Map<string, number[]>();
   constructor(private readonly perMinute: number) {}
@@ -131,6 +137,7 @@ export class Room extends YServer {
   private testLimiter = new MinuteLimiter(TEST_RUNS_PER_MINUTE);
   private eventLimiter = new MinuteLimiter(CLIENT_EVENTS_PER_MINUTE);
   private rtcLimiter = new MinuteLimiter(RTC_SIGNALS_PER_MINUTE);
+  private executeLimiter = new MinuteLimiter(SERVER_RUNS_PER_MINUTE);
   private testRequests = new Map<string, PendingTestRequest>();
 
   private get store() {
@@ -523,6 +530,11 @@ export class Room extends YServer {
           created: row.created,
         }
       : null;
+  }
+
+  async allowExecution(participantId: string): Promise<'ok' | 'ended' | 'limited'> {
+    if (this.ended) return 'ended';
+    return this.executeLimiter.allow(participantId) ? 'ok' : 'limited';
   }
 
   async getReplayLog(): Promise<Uint8Array> {

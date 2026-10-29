@@ -1,6 +1,7 @@
 import { outputsMatch, type Lang, type Question, type TestOutcome } from '@sidebyside/shared';
 import { api } from '@/lib/api';
 import { CodeRunner } from './runner';
+import { serverRunner } from './server-run';
 
 /**
  * Runs a question's tests (hidden ones included) against some code, in this browser. Only an
@@ -17,7 +18,7 @@ export async function runTestsInBrowser(
   const question = await api.json<Question>(`/rooms/${roomId}/questions/${questionId}`, {
     roomKey: slug,
   });
-  const runner = new CodeRunner();
+  const runner = new CodeRunner(serverRunner(roomId, slug));
   const outcomes: TestOutcome[] = [];
   try {
     for (const test of question.testCases) {

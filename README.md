@@ -13,7 +13,9 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
   enters. In the room, a peer-to-peer video call floats over the corner with camera, mute,
   device settings and leave controls; calls are never recorded.
 - Notes and code sync live, with everyone's cursors and presence.
-- Python, JavaScript and TypeScript run in the browser in a sandboxed WebAssembly worker.
+- Python, JavaScript and TypeScript run in the browser in a sandboxed WebAssembly worker;
+  Java, C, C++ and Go compile and run on Wandbox (wandbox.org, a free public compiler service)
+  through the Worker.
   HTML/CSS/JS renders in a live, sandboxed preview with its console output.
 - A shared whiteboard (Design tab) with live pointers, starter templates and images.
 - Interviewers keep a question bank (their own questions plus a public practice bank) with
@@ -65,7 +67,7 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 | Video call     | WebRTC mesh between browsers, signalled through the room's Durable Object   |
 | Editors        | Monaco + `y-monaco` (code), TipTap + Yjs (notes)                            |
 | Whiteboard     | Excalidraw, synced through the room's Yjs document                          |
-| Code execution | Pyodide (Python) and a JS/TS runner in a locked-down Web Worker             |
+| Code execution | Pyodide and a JS/TS runner in a Web Worker; Wandbox for Java, C, C++, Go    |
 | Tooling        | TypeScript (strict), pnpm workspaces, Turborepo, Vitest, ESLint, Prettier   |
 
 Everything runs on free plans that don't need a card: Cloudflare Workers Free (including SQLite
@@ -326,6 +328,9 @@ each step. The tests are not part of `pnpm test`.
   removed before the code starts. In production the worker script is also served with a
   Content-Security-Policy that only allows loading Pyodide from the app's own origin.
 - IP addresses are not stored.
+- Java, C, C++ and Go code (and its input) is sent to wandbox.org to run, as the Privacy page
+  says. Only people in a live room can run code there, the room rate-limits each person, and
+  candidates' hidden-test runs go from the interviewer's browser, so the tests stay private.
 - AI reports: the candidate's brief never contains private notes or the rubric; the
   interviewer report is only returned to whoever interviewed that round, and the candidate
   report only to its candidate when sharing is on. Model output is validated against a schema
@@ -344,7 +349,9 @@ each step. The tests are not part of `pnpm test`.
 
 ## Known limitations
 
-- Only Python, JavaScript and TypeScript can be run; Java, C++, C and Go can be edited but not run.
+- Java, C, C++ and Go run on Wandbox, a free public service run by volunteers: a run takes a
+  few seconds (Go compiles slowest), each person can send 20 runs or test cases a minute, and
+  "Run tests" makes one call per test case. Set `REMOTE_EXECUTION` to `"off"` to turn it off.
 - Code runs are reported by the browser that ran them, so a participant could fake their own
   run's output. Tests run in an interviewer's browser (which already holds the hidden tests), so
   **Run tests** needs an interviewer in the room.

@@ -42,6 +42,8 @@
     "AI_SUMMARY_PROVIDER": "off",
     // Workers AI model id; empty uses the default (see src/ai/provider.ts).
     "AI_MODEL": "",
+    // Java, C, C++ and Go run on Wandbox (wandbox.org, free and public): "wandbox" or "off".
+    "REMOTE_EXECUTION": "wandbox",
   },
   // Hourly retention cleanup: deletes rooms past their `delete_after` date (src/jobs/retention.ts).
   "triggers": { "crons": ["30 * * * *"] },
