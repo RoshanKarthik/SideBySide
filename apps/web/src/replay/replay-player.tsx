@@ -221,7 +221,12 @@ export function ReplayPlayer({
                 </div>
               }
             >
-              <ReplayBoard doc={cursor.doc} time={time} />
+              <ReplayBoard
+                doc={cursor.doc}
+                time={time}
+                roomId={manifest.room.id}
+                round={manifest.round}
+              />
             </Suspense>
           )}
         </main>

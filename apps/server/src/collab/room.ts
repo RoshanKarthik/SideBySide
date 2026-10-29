@@ -18,6 +18,7 @@ import {
   isInterviewerRole,
   parseRoomDocumentName,
   roomDocumentName,
+  type BoardFile,
   type ClientMessage,
   type EventType,
   type Lang,
@@ -43,7 +44,7 @@ import * as Y from 'yjs';
 import { providerFromEnv } from '../ai/provider';
 import { runReportJob, type DocTexts } from '../ai/summary';
 import { canRecordRun, type DocumentPart } from '../auth/permissions';
-import type { Actor } from '../context';
+import type { Actor, BoardFileResult } from '../context';
 import { CLOSE_CODES, CONNECTION_HEADER, type ConnectionInfo } from './protocol';
 import { buildTestRuns, type StoredTest } from './test-results';
 
@@ -170,6 +171,13 @@ export class Room extends YServer {
     this.store.exec(
       `CREATE TABLE IF NOT EXISTS room_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
     );
+    // Whiteboard images, kept out of the Yjs document so snapshots don't copy them.
+    this.store.exec(`CREATE TABLE IF NOT EXISTS board_files (
+      id TEXT PRIMARY KEY,
+      mime_type TEXT NOT NULL,
+      data_url TEXT NOT NULL,
+      created INTEGER NOT NULL
+    )`);
 
     this.ended = this.readMeta('ended') === 'true';
     this.locked = this.readMeta('locked') === 'true';
@@ -479,6 +487,42 @@ export class Room extends YServer {
     hints.push([{ index, text }]);
     await this.recordEvent(actor, 'hint_revealed', { questionId, hintIndex: index });
     return true;
+  }
+
+  async putBoardFile(file: BoardFile, fromInterviewer: boolean): Promise<BoardFileResult> {
+    if (this.ended) return 'ended';
+    if (this.locked && !fromInterviewer) return 'locked';
+    const exists = this.store
+      .exec<{ n: number }>('SELECT COUNT(*) AS n FROM board_files WHERE id = ?', file.id)
+      .one().n;
+    if (exists) return 'stored';
+    const count = this.store.exec<{ n: number }>('SELECT COUNT(*) AS n FROM board_files').one().n;
+    if (count >= LIMITS.boardImagesPerDocument) return 'full';
+    this.store.exec(
+      'INSERT INTO board_files (id, mime_type, data_url, created) VALUES (?, ?, ?, ?)',
+      file.id,
+      file.mimeType,
+      file.dataURL,
+      file.created,
+    );
+    return 'stored';
+  }
+
+  async getBoardFile(id: string): Promise<BoardFile | null> {
+    const row = this.store
+      .exec<{ id: string; mime_type: string; data_url: string; created: number }>(
+        'SELECT id, mime_type, data_url, created FROM board_files WHERE id = ?',
+        id,
+      )
+      .toArray()[0];
+    return row
+      ? {
+          id: row.id,
+          mimeType: row.mime_type as BoardFile['mimeType'],
+          dataURL: row.data_url,
+          created: row.created,
+        }
+      : null;
   }
 
   async getReplayLog(): Promise<Uint8Array> {

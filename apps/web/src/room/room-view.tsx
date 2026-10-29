@@ -303,6 +303,9 @@ export function RoomView({
               >
                 <DesignBoard
                   conn={conn}
+                  roomId={room.id}
+                  slug={slug}
+                  round={room.currentRound}
                   interviewer={interviewer}
                   active={tab === 'design'}
                   readOnly={!interviewer && conn.locked}

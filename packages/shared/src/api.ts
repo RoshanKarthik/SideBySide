@@ -239,3 +239,20 @@ export const sessionSummarySchema = z.object({
   canViewReplay: z.boolean(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+
+/** Raster formats only: SVG can carry scripts. */
+export const BOARD_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
+
+/** An image placed on the whiteboard; board elements reference it by `id` (Excalidraw's fileId). */
+export const boardFileSchema = z
+  .object({
+    id: z.string().regex(/^[\w-]{1,100}$/),
+    mimeType: z.enum(BOARD_IMAGE_TYPES),
+    dataURL: z.string().max(LIMITS.boardImageChars, 'The image is too large'),
+    created: z.number().int().nonnegative(),
+  })
+  .refine((file) => file.dataURL.startsWith(`data:${file.mimeType};base64,`), {
+    message: 'The image must be a base64 data URL of its type',
+    path: ['dataURL'],
+  });
+export type BoardFile = z.infer<typeof boardFileSchema>;

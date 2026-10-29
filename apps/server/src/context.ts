@@ -1,5 +1,5 @@
 import type { Database, DbHandle } from '@sidebyside/db';
-import type { Lang, PracticePrefs, QueueStatus } from '@sidebyside/shared';
+import type { BoardFile, Lang, PracticePrefs, QueueStatus } from '@sidebyside/shared';
 import type { SharedProblem } from '@sidebyside/shared/doc';
 import type { Auth } from './auth/auth';
 import type { DocumentPart } from './auth/permissions';
@@ -29,7 +29,15 @@ export interface RoomRpc {
   revealHint(actor: Actor, questionId: string, index: number, text: string): Promise<boolean>;
   /** Writes the round's AI reports in the background (shared document only). */
   generateReports(): Promise<void>;
+  /**
+   * Stores a whiteboard image once in this document; board elements reference it by id. Locked
+   * rooms take images only from interviewers (`fromInterviewer`).
+   */
+  putBoardFile(file: BoardFile, fromInterviewer: boolean): Promise<BoardFileResult>;
+  getBoardFile(id: string): Promise<BoardFile | null>;
 }
+
+export type BoardFileResult = 'stored' | 'ended' | 'locked' | 'full';
 
 export interface AppEnv {
   Bindings: Env;

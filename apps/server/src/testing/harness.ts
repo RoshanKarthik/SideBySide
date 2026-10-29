@@ -1,8 +1,9 @@
 import type { DbHandle } from '@sidebyside/db';
 import { createTestDb } from '@sidebyside/db/testing';
+import type { BoardFile } from '@sidebyside/shared';
 import { expect, vi } from 'vitest';
 import { createApp } from '../app';
-import type { AppDeps, MatchmakerRpc, RoomRpc } from '../context';
+import type { AppDeps, BoardFileResult, MatchmakerRpc, RoomRpc } from '../context';
 import { MatchQueue } from '../practice/queue';
 import { createPracticeRoom } from '../practice/rooms';
 
@@ -29,6 +30,8 @@ export interface RequestOptions extends RequestInit {
 export async function createHarness(envOverrides: Record<string, string> = {}) {
   const env = { ...testEnv, ...envOverrides } as Env;
   const handle: DbHandle = await createTestDb();
+  // Whiteboard images by id, standing in for the room's storage.
+  const boardFiles = new Map<string, BoardFile>();
   const roomRpc = {
     end: vi.fn(async () => {}),
     closeRound: vi.fn(async () => {}),
@@ -37,6 +40,11 @@ export async function createHarness(envOverrides: Record<string, string> = {}) {
     showQuestion: vi.fn(async () => {}),
     revealHint: vi.fn(async () => true),
     generateReports: vi.fn(async () => {}),
+    putBoardFile: vi.fn(async (file: BoardFile): Promise<BoardFileResult> => {
+      boardFiles.set(file.id, file);
+      return 'stored';
+    }),
+    getBoardFile: vi.fn(async (id: string) => boardFiles.get(id) ?? null),
   } satisfies RoomRpc;
   // The real queue logic, creating rooms in the test database.
   const queue = new MatchQueue((a, b, prefs) => createPracticeRoom(handle.db, a, b, prefs));

@@ -34,6 +34,8 @@ beforeAll(async () => {
       showQuestion: async () => {},
       revealHint: async () => true,
       generateReports: async () => {},
+      putBoardFile: async () => 'stored',
+      getBoardFile: async () => null,
     }),
     matchmaker: async () => {
       throw new Error('Not used in these tests');

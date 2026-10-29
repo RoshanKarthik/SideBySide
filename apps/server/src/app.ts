@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { boardFileRoutes } from './api/board-files';
 import { claimRoutes } from './api/claim';
 import { meRoutes } from './api/me';
 import { practiceRoutes } from './api/practice';
@@ -66,6 +67,7 @@ export function createApp(deps: AppDeps) {
   app.route('/', sessionRoutes(deps));
   app.route('/', questionRoutes());
   app.route('/', practiceRoutes(deps));
+  app.route('/', boardFileRoutes(deps));
   app.route('/', claimRoutes());
   app.route('/', reportRoutes(deps));
 

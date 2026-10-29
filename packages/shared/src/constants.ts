@@ -11,6 +11,10 @@ export const LIMITS = {
   runsPerMinute: 10,
   /** Code runs a room may record per session. */
   runsPerRoom: 300,
+  /** One whiteboard image as a data URL (about 500 KB of image); browsers shrink larger ones. */
+  boardImageChars: 700_000,
+  /** Images one whiteboard (one room document) can hold. */
+  boardImagesPerDocument: 30,
 } as const;
 
 export const RETENTION_DAYS = [7, 30, 90] as const;

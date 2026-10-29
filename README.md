@@ -15,7 +15,7 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 - Notes and code sync live, with everyone's cursors and presence.
 - Python, JavaScript and TypeScript run in the browser in a sandboxed WebAssembly worker.
   HTML/CSS/JS renders in a live, sandboxed preview with its console output.
-- A shared whiteboard (Design tab) with live pointers and starter templates.
+- A shared whiteboard (Design tab) with live pointers, starter templates and images.
 - Interviewers keep a question bank (their own questions plus a public practice bank) with
   starter code, hints and test cases. **Show to candidate** loads the problem and starter code;
   **Run tests** reports pass/fail and a score out of 100 weighted by each test's weight, and
@@ -136,8 +136,10 @@ packages/
   questions and test cases, rubric scores, practice ratings.
 - **Each room's Durable Objects (SQLite):** the live shared Yjs document (notes, code,
   whiteboard), every update with its server timestamp, and a snapshot every minute. Replay reads
-  from here. Interviewer-only data (private notes, rubric, timer) lives in a second document
-  that candidates can't connect to. Each practice round has its own pair of documents.
+  from here. Whiteboard images are stored once beside the document (not inside it, so snapshots
+  stay small) and the board references them by id. Interviewer-only data (private notes,
+  rubric, timer) lives in a second document that candidates can't connect to. Each practice
+  round has its own pair of documents.
 - **The Matchmaker Durable Object:** the practice queue (people waiting and recent matches).
 
 ## Local development
@@ -334,6 +336,8 @@ each step. The tests are not part of `pnpm test`.
 - The HTML/CSS/JS preview runs in an iframe sandbox without `allow-same-origin`, so the page
   can't reach the app's cookies, storage or DOM.
 - Company logos are stored as small PNG, JPEG or WebP data URLs (SVG is refused).
+- Whiteboard images are raster only (PNG, JPEG, WebP, GIF; SVG is redrawn as JPEG in the
+  browser), at most about 500 KB each and 30 per board, and only room members can fetch them.
 - A guest's claim token is derived from their seat with a server secret, stored only as a
   SHA-256 hash, and cleared once used. Claiming needs a signed-in account that isn't already in
   the room, and is refused if the interviewer no longer shares anything with the candidate.
@@ -344,7 +348,6 @@ each step. The tests are not part of `pnpm test`.
 - Code runs are reported by the browser that ran them, so a participant could fake their own
   run's output. Tests run in an interviewer's browser (which already holds the hidden tests), so
   **Run tests** needs an interviewer in the room.
-- Images can't be added to the whiteboard.
 - Video calls use public STUN servers only. Most networks connect directly, but some strict
   corporate networks need a TURN relay (for example Cloudflare's), which isn't set up yet. Calls
   are a mesh, so they suit interviews of two to four people, not large meetings.

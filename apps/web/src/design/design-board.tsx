@@ -11,6 +11,8 @@ import type { RemoteExcalidrawElement } from '@excalidraw/excalidraw/data/reconc
 import type { ExcalidrawElementSkeleton } from '@excalidraw/excalidraw/data/transform';
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type {
+  BinaryFileData,
+  BinaryFiles,
   Collaborator,
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
@@ -23,9 +25,11 @@ import { DropdownMenu } from 'radix-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toaster';
 import { useCurrentTheme } from '@/lib/theme';
 import { isLowBandwidth } from '@/lib/use-me';
 import type { RoomConnection } from '@/room/use-room';
+import { fetchBoardFile, uploadBoardFile } from './board-files';
 import { LOCAL_ORIGIN, readElements, writeElements } from './board-sync';
 import { asBoard, asExcalidraw } from './excalidraw-setup';
 import { BOARD_TEMPLATES, type BoardTemplate } from './templates';
@@ -37,6 +41,10 @@ const POINTER_MS_LOW_BANDWIDTH = 400;
 
 interface Props {
   conn: RoomConnection;
+  roomId: string;
+  /** Room slug: the key for a guest's token. */
+  slug: string;
+  round: number;
   interviewer: boolean;
   /** Whether the Design tab is the one showing. */
   active: boolean;
@@ -44,7 +52,15 @@ interface Props {
 }
 
 /** The Design tab: an Excalidraw whiteboard kept in the room's shared doc. */
-export default function DesignBoard({ conn, interviewer, active, readOnly }: Props) {
+export default function DesignBoard({
+  conn,
+  roomId,
+  slug,
+  round,
+  interviewer,
+  active,
+  readOnly,
+}: Props) {
   const { doc, provider } = conn;
   const board = getBoard(doc);
   const theme = useCurrentTheme();
@@ -54,9 +70,41 @@ export default function DesignBoard({ conn, interviewer, active, readOnly }: Pro
     scrollToContent: true,
   }));
 
+  // Images: whoever places one uploads it to the room once; everyone else fetches the images
+  // their board is missing. Ids seen here are never uploaded or fetched twice.
+  const knownFiles = useRef(new Set<string>());
+  const loadMissingFiles = useCallback(
+    (elements: readonly OrderedExcalidrawElement[]) => {
+      if (!api) return;
+      const have = api.getFiles();
+      for (const el of elements) {
+        if (el.type !== 'image' || el.isDeleted || !el.fileId) continue;
+        if (have[el.fileId] || knownFiles.current.has(el.fileId)) continue;
+        knownFiles.current.add(el.fileId);
+        void fetchBoardFile(roomId, round, el.fileId, slug)
+          .then((file) => file && api.addFiles([file as unknown as BinaryFileData]))
+          .catch(() => knownFiles.current.delete(el.fileId!));
+      }
+    },
+    [api, roomId, round, slug],
+  );
+  const uploadNewFiles = (elements: readonly OrderedExcalidrawElement[], files: BinaryFiles) => {
+    for (const el of elements) {
+      if (el.type !== 'image' || el.isDeleted || !el.fileId) continue;
+      const file = files[el.fileId];
+      if (!file || knownFiles.current.has(el.fileId)) continue;
+      knownFiles.current.add(el.fileId);
+      uploadBoardFile(roomId, slug, file).catch((err: Error) =>
+        toast.error(`The image couldn't be added for everyone: ${err.message}`),
+      );
+    }
+  };
+
   // Shared doc → canvas.
   useEffect(() => {
     if (!api) return;
+    // Images already on the board when it opened.
+    loadMissingFiles(api.getSceneElements());
     const apply = (ids?: Iterable<string>) => {
       const remote = readElements(board, ids);
       if (!remote.length) return;
@@ -67,6 +115,7 @@ export default function DesignBoard({ conn, interviewer, active, readOnly }: Pro
         api.getAppState(),
       );
       api.updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER });
+      loadMissingFiles(restored);
     };
     const onChange = (event: Y.YMapEvent<Record<string, unknown>>, tx: Y.Transaction) => {
       if (tx.origin !== LOCAL_ORIGIN) apply(event.keysChanged);
@@ -75,7 +124,7 @@ export default function DesignBoard({ conn, interviewer, active, readOnly }: Pro
     // Anything that arrived between the first render and the API being ready.
     apply();
     return () => board.unobserve(onChange);
-  }, [api, board]);
+  }, [api, board, loadMissingFiles]);
 
   // Canvas → shared doc, batched while someone drags or draws.
   const pending = useRef<readonly OrderedExcalidrawElement[] | null>(null);
@@ -93,8 +142,13 @@ export default function DesignBoard({ conn, interviewer, active, readOnly }: Pro
   }, [board]);
   useEffect(() => flush, [flush]);
   const pointerDown = useRef(false);
-  const onSceneChange = (elements: readonly OrderedExcalidrawElement[]) => {
+  const onSceneChange = (
+    elements: readonly OrderedExcalidrawElement[],
+    _appState: unknown,
+    files: BinaryFiles,
+  ) => {
     if (readOnlyRef.current) return;
+    uploadNewFiles(elements, files);
     pending.current = elements;
     // Low-bandwidth mode sends a drag once, when the pointer is released.
     if (isLowBandwidth() && pointerDown.current) return;
@@ -195,8 +249,8 @@ export default function DesignBoard({ conn, interviewer, active, readOnly }: Pro
               toggleTheme: false,
               export: false,
             },
-            // Images would need a shared file store; not supported on the board.
-            tools: { image: false },
+            // Images are stored once in the room and fetched by everyone (see board-files.ts).
+            tools: { image: true },
           }}
         >
           <MainMenu>
