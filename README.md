@@ -336,9 +336,10 @@ each step. The tests are not part of `pnpm test`.
 - Migrations have been applied to the production branch.
 - The retention Cron Trigger (`30 * * * *`, from `wrangler.jsonc`) shows under the Worker's
   Settings → Triggers. Cron Triggers are included in the free plan.
-- The Privacy and Terms pages contain reviewed text. They are placeholders today; have them
-  reviewed (for example against India's Digital Personal Data Protection Act) before a public
-  launch.
+- The Privacy and Terms pages are drafts that describe how the app works; have them reviewed
+  (for example against India's Digital Personal Data Protection Act) and set `CONTACT_EMAIL`
+  in `apps/web/src/routes/legal.tsx` before a public launch. Update them when the app changes
+  what it stores or which services it uses.
 
 ## Security notes
 
