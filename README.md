@@ -7,7 +7,7 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 
 **Live:** https://sidebyside.roshankarrthik.workers.dev
 
-- Interviewers sign in (Google or GitHub) and create a room.
+- Interviewers sign in (Google, GitHub or a link sent to their email) and create a room.
 - Candidates open the link, enter their name, accept the recording notice and join. No account.
 - A lobby checks camera and microphone (with device pickers and a level meter) before anyone
   enters. In the room, a peer-to-peer video call floats over the corner with camera, mute,
@@ -61,7 +61,7 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 | Realtime       | Yjs, one Durable Object per room (`y-partyserver`), SQLite storage per room |
 | Matchmaking    | One `Matchmaker` Durable Object holding the practice queue                  |
 | Database       | Neon Postgres via Cloudflare Hyperdrive, Drizzle ORM                        |
-| Auth           | Better Auth (Google + GitHub), room-scoped JWTs for guests                  |
+| Auth           | Better Auth (Google, GitHub, email links), room-scoped JWTs for guests      |
 | API            | Hono + zod                                                                  |
 | Web            | React 19, Vite, React Router, TanStack Query, Tailwind CSS 4, Radix UI      |
 | UI             | Geist + Instrument Serif (self-hosted), cmdk palette, sonner toasts         |
@@ -99,6 +99,7 @@ flowchart LR
 
   postgres[("Neon Postgres<br/>users · rooms · participants · events<br/>questions · code runs · reports")]
   oauth["Google and GitHub sign-in"]
+  gmail["Gmail SMTP<br/>sign-in links"]
 
   pages -- "HTTPS /api" --> worker
   editors <-- "WebSocket /collab" --> room
@@ -107,6 +108,7 @@ flowchart LR
   worker --> room
   worker --> matchmaker
   worker <--> oauth
+  worker -- "sign-in emails" --> gmail
   cron --> worker
   room -- "report job" --> ai
   room -. "if Workers AI fails" .-> groq
@@ -180,7 +182,8 @@ docker run -d --name sbs-dev-postgres -e POSTGRES_USER=sbs -e POSTGRES_PASSWORD=
    ```
 
    With `ALLOW_DEV_LOGIN=true` you can sign in with email and password locally, so OAuth apps are
-   optional for development.
+   optional for development. Email sign-in links are printed to the `pnpm dev` output instead of
+   being sent, unless `SMTP_USER` and `SMTP_PASSWORD` are set.
 
 4. Create the tables and load the public question bank:
 
@@ -307,6 +310,12 @@ each step. The tests are not part of `pnpm test`.
    `npx wrangler secret put TURN_KEY_API_TOKEN`. The room hands browsers short-lived
    credentials; the key never leaves the server.
 
+   **Sign-in by email link (optional).** Turn on 2-Step Verification for a Gmail account, then
+   create an App Password for it (Google Account → Security → App passwords). From
+   `apps/server` run `npx wrangler secret put SMTP_USER` (the Gmail address) and
+   `npx wrangler secret put SMTP_PASSWORD` (the App Password). Links are then sent from that
+   address; without these secrets the email option doesn't appear on the sign-in page.
+
 6. **App URL.** The `deploy` script in `apps/server/package.json` passes the production URL
    (`https://sidebyside.roshankarrthik.workers.dev`) as `PUBLIC_APP_URL`; `wrangler.jsonc` keeps
    the local one. Change it there if the address changes. Keep `ALLOW_DEV_LOGIN` set to
@@ -360,6 +369,9 @@ each step. The tests are not part of `pnpm test`.
 - Company logos are stored as small PNG, JPEG or WebP data URLs (SVG is refused).
 - Whiteboard images are raster only (PNG, JPEG, WebP, GIF; SVG is redrawn as JPEG in the
   browser), at most about 500 KB each and 30 per board, and only room members can fetch them.
+- Sign-in links work once and expire after 10 minutes. Each address gets at most 3 links per
+  15 minutes and the app sends at most 400 a day; these limits keep only a SHA-256 hash of the
+  address, deleted after a day.
 - A guest's claim token is derived from their seat with a server secret, stored only as a
   SHA-256 hash, and cleared once used. Claiming needs a signed-in account that isn't already in
   the room, and is refused if the interviewer no longer shares anything with the candidate.
@@ -378,7 +390,8 @@ each step. The tests are not part of `pnpm test`.
   sessions' reports). Beyond that, Groq writes them if `GROQ_API_KEY` is set (its free tier has
   its own daily limits); otherwise they fail with a quota message and can be regenerated the
   next day.
-- Sign-in by email link isn't available (it needs an email sender and a domain).
+- Sign-in emails come from a Gmail account, so the app sends at most 400 a day (Gmail allows
+  500), and without a domain of its own they can land in spam.
 - Retention cleanup runs every hour and deletes at most 100 rooms per run, so a room can
   outlive its `delete_after` date by up to an hour (longer only with a backlog of over 100
   expired rooms). A room whose documents can't be purged keeps its row and is retried next run.

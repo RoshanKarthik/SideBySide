@@ -17,3 +17,7 @@ CLOUDFLARE_ACCOUNT_ID=
 CLOUDFLARE_AI_TOKEN=
 # Optional: Groq (console.groq.com, free key) takes over when Workers AI fails.
 GROQ_API_KEY=
+# Optional: send email sign-in links through a Gmail account and its App Password. Without them
+# (and with ALLOW_DEV_LOGIN=true) the links are printed to the dev server output.
+SMTP_USER=
+SMTP_PASSWORD=
