@@ -239,7 +239,7 @@ export async function writeReport(
   provider: SummaryProvider,
   kind: ReportKind,
   brief: string,
-): Promise<Record<string, unknown>> {
+): Promise<{ content: Record<string, unknown>; model: string }> {
   const schema = SCHEMAS[kind];
   const jsonSchema = z.toJSONSchema(schema);
   let problem = '';
@@ -247,9 +247,9 @@ export async function writeReport(
     const user = attempt
       ? `${brief}\n\nYour previous answer was not valid (${problem}). Reply again with JSON that matches the schema exactly.`
       : brief;
-    const raw = await provider.complete({ system: SYSTEM[kind], user, jsonSchema });
-    const result = schema.safeParse(parseAnswer(raw));
-    if (result.success) return result.data as Record<string, unknown>;
+    const { answer, model } = await provider.complete({ system: SYSTEM[kind], user, jsonSchema });
+    const result = schema.safeParse(parseAnswer(answer));
+    if (result.success) return { content: result.data as Record<string, unknown>, model };
     problem = result.error.issues
       .slice(0, 3)
       .map((i) => `${i.path.join('.') || 'answer'}: ${i.message}`)
@@ -289,12 +289,12 @@ export async function runReportJob(options: {
     (['interviewer', 'candidate'] as const).map(async (kind) => {
       let update: Partial<typeof sessionReports.$inferInsert>;
       try {
-        const content = await writeReport(provider, kind, briefs[kind]);
+        const { content, model } = await writeReport(provider, kind, briefs[kind]);
         update = {
           status: 'ready',
           content,
           error: null,
-          model: provider.name,
+          model,
           generatedAt: new Date(),
         };
       } catch (err) {

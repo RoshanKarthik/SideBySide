@@ -38,10 +38,14 @@
     "TRUSTED_ORIGINS": "",
     "ALLOW_DEV_LOGIN": "false",
     // AI post-interview reports: "workers-ai" (needs the CLOUDFLARE_ACCOUNT_ID and
-    // CLOUDFLARE_AI_TOKEN secrets), "sample" (local development only) or "off".
-    "AI_SUMMARY_PROVIDER": "off",
+    // CLOUDFLARE_AI_TOKEN secrets; with a GROQ_API_KEY secret too, Groq takes over when the
+    // Workers AI allowance runs out), "groq" (GROQ_API_KEY only), "sample" (local development
+    // only) or "off". Without the secrets, reports stay off.
+    "AI_SUMMARY_PROVIDER": "workers-ai",
     // Workers AI model id; empty uses the default (see src/ai/provider.ts).
     "AI_MODEL": "",
+    // Groq model id for the fallback; empty uses the default.
+    "GROQ_MODEL": "",
     // Java, C, C++ and Go run on Wandbox (wandbox.org, free and public): "wandbox" or "off".
     "REMOTE_EXECUTION": "wandbox",
   },

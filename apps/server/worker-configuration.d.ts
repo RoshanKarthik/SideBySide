@@ -8,6 +8,10 @@ interface __BaseEnv_Env {
   AI_SUMMARY_PROVIDER: string;
   AI_MODEL: string;
   REMOTE_EXECUTION: string;
+  GROQ_MODEL: string;
+  GROQ_API_KEY: string;
+  CLOUDFLARE_ACCOUNT_ID: string;
+  CLOUDFLARE_AI_TOKEN: string;
   TURN_KEY_ID: string;
   TURN_KEY_API_TOKEN: string;
   BETTER_AUTH_SECRET: string;
@@ -40,6 +44,10 @@ declare namespace NodeJS {
       | 'AI_SUMMARY_PROVIDER'
       | 'AI_MODEL'
       | 'REMOTE_EXECUTION'
+      | 'GROQ_MODEL'
+      | 'GROQ_API_KEY'
+      | 'CLOUDFLARE_ACCOUNT_ID'
+      | 'CLOUDFLARE_AI_TOKEN'
       | 'TURN_KEY_ID'
       | 'TURN_KEY_API_TOKEN'
       | 'BETTER_AUTH_SECRET'

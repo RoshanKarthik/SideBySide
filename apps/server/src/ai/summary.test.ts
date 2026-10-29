@@ -21,7 +21,7 @@ function provider(answers: unknown[]): SummaryProvider & { calls: number } {
       const answer = answers[Math.min(p.calls, answers.length - 1)];
       p.calls++;
       if (answer instanceof Error) throw answer;
-      return answer;
+      return { answer, model: 'fake' };
     }),
   };
   return p;
@@ -49,12 +49,15 @@ afterAll(async () => {
 describe('writeReport', () => {
   it('accepts JSON returned as text', async () => {
     const p = provider([`Here you go: ${JSON.stringify(CANDIDATE)}`]);
-    expect(await writeReport(p, 'candidate', 'brief')).toEqual(CANDIDATE);
+    expect(await writeReport(p, 'candidate', 'brief')).toEqual({
+      content: CANDIDATE,
+      model: 'fake',
+    });
   });
 
   it('retries once after an invalid answer', async () => {
     const p = provider([{ wentWell: 'not a list' }, CANDIDATE]);
-    expect(await writeReport(p, 'candidate', 'brief')).toEqual(CANDIDATE);
+    expect((await writeReport(p, 'candidate', 'brief')).content).toEqual(CANDIDATE);
     expect(p.calls).toBe(2);
   });
 

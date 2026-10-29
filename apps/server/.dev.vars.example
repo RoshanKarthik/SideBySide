@@ -15,3 +15,5 @@ TRUSTED_ORIGINS=http://127.0.0.1:5173,http://guest.localhost:5173
 AI_SUMMARY_PROVIDER=sample
 CLOUDFLARE_ACCOUNT_ID=
 CLOUDFLARE_AI_TOKEN=
+# Optional: Groq (console.groq.com, free key) takes over when Workers AI fails.
+GROQ_API_KEY=
