@@ -56,6 +56,7 @@ const pages = {
   settings: () => import('@/routes/settings'),
   feedback: () => import('@/routes/feedback'),
   claim: () => import('@/routes/claim'),
+  join: () => import('@/routes/join'),
   // Named exports, so every page stays out of the bundle the room and landing pages load first.
   dashboard: () => import('@/routes/dashboard').then((m) => ({ default: m.DashboardPage })),
   privacy: () => import('@/routes/legal').then((m) => ({ default: m.PrivacyPage })),
@@ -80,6 +81,7 @@ const router = createBrowserRouter([
   { path: '/', element: lazyPage(pages.landing) },
   { path: '/login', element: lazyPage(pages.login) },
   { path: '/dashboard', element: lazyPage(pages.dashboard) },
+  { path: '/join', element: lazyPage(pages.join) },
   { path: '/r/:slug', element: lazyPage(pages.room) },
   { path: '/r/:slug/feedback', element: lazyPage(pages.feedback) },
   { path: '/rooms/:id/replay', element: lazyPage(pages.replay) },

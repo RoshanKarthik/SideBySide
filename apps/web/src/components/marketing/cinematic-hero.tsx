@@ -152,6 +152,12 @@ export function CinematicHero({ id }: { id?: string }) {
             Practise with a peer
           </Link>
         </div>
+        <p className="animate-fade-rise-delay-2 mt-6 text-sm text-muted-foreground">
+          Have a room ID?{' '}
+          <Link to="/join" className="text-foreground underline underline-offset-4">
+            Join a room
+          </Link>
+        </p>
       </div>
     </section>
   );

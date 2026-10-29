@@ -18,7 +18,9 @@ import {
   Copy,
   FileText,
   Gauge,
+  Hash,
   History,
+  LogIn,
   MoreHorizontal,
   Plus,
   Radio,
@@ -142,6 +144,11 @@ export function DashboardPage() {
           description="Your interviews, candidates and results in one place."
           actions={
             <>
+              <Button variant="outline" asChild>
+                <Link to="/join">
+                  <LogIn /> Join a room
+                </Link>
+              </Button>
               <Button variant="outline" asChild>
                 <Link to="/questions">
                   <BookOpen /> Question bank
@@ -359,11 +366,14 @@ function ActiveRoomCard({ room }: { room: RoomListItem }) {
         {room.candidateName ? `with ${room.candidateName}` : 'Waiting for the candidate'} ·{' '}
         {LANGUAGE_INFO[room.defaultLanguage].label}
       </p>
+      {room.mode !== 'practice' && (
+        <p className="mt-1 font-mono text-xs text-muted-foreground">Room ID {room.slug}</p>
+      )}
       <div className="mt-4 flex gap-2">
         <Button size="sm" className="flex-1" asChild>
           <Link to={`/r/${room.slug}`}>{live ? 'Rejoin' : 'Open room'}</Link>
         </Button>
-        {room.mode !== 'practice' && <CopyLinkButton link={link} />}
+        {room.mode !== 'practice' && <CopyButton text={link} />}
       </div>
     </Card>
   );
@@ -514,6 +524,16 @@ function RoomRow({ room }: { room: RoomListItem }) {
                   <Copy /> Copy candidate link
                 </MenuItem>
               )}
+              {!ended && room.mode !== 'practice' && (
+                <MenuItem
+                  onSelect={async () => {
+                    await navigator.clipboard.writeText(room.slug);
+                    toast.success('Room ID copied');
+                  }}
+                >
+                  <Hash /> Copy room ID
+                </MenuItem>
+              )}
               <MenuSeparator />
               <MenuItem destructive onSelect={() => setConfirm(true)}>
                 <Trash2 /> {removal.menuLabel}
@@ -555,21 +575,21 @@ export function ScoreBar({ score }: { score: number }) {
   );
 }
 
-function CopyLinkButton({ link }: { link: string }) {
+function CopyButton({ text, what = 'link' }: { text: string; what?: 'link' | 'ID' }) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
       size="sm"
       variant="outline"
       onClick={async () => {
-        await navigator.clipboard.writeText(link);
+        await navigator.clipboard.writeText(text);
         setCopied(true);
-        toast.success('Room link copied');
+        toast.success(`Room ${what} copied`);
         setTimeout(() => setCopied(false), 1500);
       }}
     >
       {copied ? <Check /> : <Copy />}
-      {copied ? 'Copied' : 'Copy link'}
+      {copied ? 'Copied' : `Copy ${what}`}
     </Button>
   );
 }
@@ -628,7 +648,7 @@ function NewRoomDialog({
         title={created ? 'Room ready' : 'New interview room'}
         description={
           created
-            ? 'Send this link to the candidate. They join with just their name.'
+            ? 'Send the candidate this link, or tell them the room ID to enter at /join. They join with just their name.'
             : 'Create a room and share its link with the candidate.'
         }
         hideDescription={!created}
@@ -637,7 +657,14 @@ function NewRoomDialog({
           <div className="mt-5 space-y-4">
             <div className="flex items-center gap-2 rounded-lg border bg-background/60 p-1.5 pl-3">
               <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{created.link}</span>
-              <CopyLinkButton link={created.link} />
+              <CopyButton text={created.link} />
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-background/60 p-1.5 pl-3">
+              <span className="text-xs text-muted-foreground">Room ID</span>
+              <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
+                {created.room.slug}
+              </span>
+              <CopyButton text={created.room.slug} what="ID" />
             </div>
             <div className="flex justify-end">
               <Button asChild>

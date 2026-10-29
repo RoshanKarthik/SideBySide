@@ -22,8 +22,6 @@ export const DEFAULT_RETENTION_DAYS = 30;
 
 export const GUEST_TOKEN_TTL_SECONDS = 12 * 60 * 60;
 
-export const ROOM_SLUG_LENGTH = 10;
-
 /** How often (session time) the room writes a full Yjs snapshot for replay seeking. */
 export const SNAPSHOT_INTERVAL_MS = 60_000;
 

@@ -2,6 +2,7 @@ import {
   brandOrNull,
   createRoomSchema,
   eventVisibility,
+  generateRoomId,
   joinRoomSchema,
   type CreateRoomResponse,
   type JoinRoomResponse,
@@ -35,7 +36,6 @@ import { canEndSession, canViewReplay } from '../auth/permissions';
 import type { AppDeps, AppEnv } from '../context';
 import { HttpError, badRequest, conflict, forbidden, notFound, unauthorized } from '../lib/errors';
 import { parseBody } from '../lib/validate';
-import { randomSlug } from '../lib/slug';
 import { buildMarkers } from '../lib/markers';
 import { loadRounds, parseRound, seesPrivateDataOf } from '../lib/rounds';
 import { roomBrand, roomLink, toBrand, toRoomDto } from '../lib/serialize';
@@ -84,7 +84,7 @@ export function roomRoutes(deps: AppDeps) {
     const room = await db.transaction(async (tx) => {
       const [row] = await tx
         .insert(rooms)
-        .values({ ...input, slug: randomSlug(), ownerId: user.id, mode: 'interview' })
+        .values({ ...input, slug: generateRoomId(), ownerId: user.id, mode: 'interview' })
         .returning();
       if (!row) throw new Error('Room insert returned nothing');
       const [owner] = await tx

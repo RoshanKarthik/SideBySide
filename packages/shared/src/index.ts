@@ -7,3 +7,4 @@ export * from './roles';
 export * from './questions';
 export * from './practice';
 export * from './reports';
+export * from './room-id';

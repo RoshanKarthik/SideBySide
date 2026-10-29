@@ -68,7 +68,7 @@ export default function RoomRoute() {
   if (publicInfo.error) {
     return (
       <Suspense fallback={null}>
-        <NotFoundPage message="This room link is not valid." />
+        <NotFoundPage message="No room has this link or ID." />
       </Suspense>
     );
   }

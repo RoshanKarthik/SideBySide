@@ -8,7 +8,8 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 **Live:** https://sidebyside.roshankarrthik.workers.dev
 
 - Interviewers sign in (Google, GitHub or a link sent to their email) and create a room.
-- Candidates open the link, enter their name, accept the recording notice and join. No account.
+- Candidates open the link, or type its room ID (like `kxmp-7rtw-q4hn`) on the Join a room page,
+  enter their name, accept the recording notice and join. No account.
 - A lobby checks camera and microphone (with device pickers and a level meter) before anyone
   enters. In the room, a peer-to-peer video call floats over the corner with camera, mute,
   device settings and leave controls; calls are never recorded.
@@ -347,6 +348,8 @@ each step. The tests are not part of `pnpm test`.
   server for both REST and WebSocket requests.
 - Cookie-authenticated writes are rejected unless they come from a trusted origin.
 - Guests get a 12-hour token scoped to one room.
+- Anyone with a room's link or ID can join it as a guest, so room IDs are 12 random characters
+  (60 bits): short enough to read out, far too many to guess.
 - Candidates can't connect to a room's private document, and the interviewer-only question API
   rejects them. Test results are filtered on the server, so a candidate's copy never contains
   hidden tests' input or expected output.

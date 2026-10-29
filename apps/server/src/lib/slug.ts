@@ -1,10 +1,8 @@
-import { ROOM_SLUG_LENGTH } from '@sidebyside/shared';
-
 // No look-alike characters (0/O, 1/l/I), so links survive being read aloud or retyped.
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-/** A random, URL-safe, unguessable room slug (~57 bits of entropy at 10 characters). */
-export function randomSlug(length = ROOM_SLUG_LENGTH): string {
+/** A random, URL-safe, unguessable token (about 5.8 bits of entropy per character). */
+export function randomSlug(length: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length * 2));
   let out = '';
   // Rejection sampling keeps the distribution uniform.

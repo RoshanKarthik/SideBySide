@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
   Check,
+  Hash,
   Code2,
   Link2,
   Lock,
@@ -196,6 +197,7 @@ export function RoomView({
         <PresenceAvatars peers={conn.peers} selfClientId={conn.doc.clientID} />
         <span className="hidden h-6 w-px bg-border sm:block" aria-hidden />
         <CallControls call={call} media={media} />
+        {interviewer && !practice && <CopyRoomId slug={slug} />}
         {interviewer && !practice && <CopyCandidateLink slug={slug} />}
         {interviewer && <EndSessionButton pending={end.isPending} onConfirm={() => end.mutate()} />}
         {interviewer && (
@@ -411,6 +413,27 @@ function TabPeers({
         />
       ))}
     </span>
+  );
+}
+
+function CopyRoomId({ slug }: { slug: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Tooltip content="Copy the room ID, which candidates can enter at /join">
+      <Button
+        variant="outline"
+        size="sm"
+        className="hidden font-mono min-[1200px]:inline-flex"
+        onClick={async () => {
+          await navigator.clipboard.writeText(slug);
+          setCopied(true);
+          toast.success('Room ID copied');
+          setTimeout(() => setCopied(false), 1500);
+        }}
+      >
+        {copied ? <Check /> : <Hash />} {slug}
+      </Button>
+    </Tooltip>
   );
 }
 

@@ -1,6 +1,5 @@
 import { participants, rooms, sessionRounds, type Database } from '@sidebyside/db';
-import type { PracticePrefs, QueueEntry } from '@sidebyside/shared';
-import { randomSlug } from '../lib/slug';
+import { generateRoomId, type PracticePrefs, type QueueEntry } from '@sidebyside/shared';
 
 const TITLE_CASE = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -18,7 +17,7 @@ export async function createPracticeRoom(
     const [room] = await tx
       .insert(rooms)
       .values({
-        slug: randomSlug(),
+        slug: generateRoomId(),
         ownerId: first.userId,
         mode: 'practice',
         title: `Practice · ${TITLE_CASE(prefs.topic)} · ${TITLE_CASE(prefs.difficulty)}`,

@@ -99,7 +99,8 @@ describe('interview room flow', () => {
     const body = (await res.json()) as { room: { id: string; slug: string }; link: string };
     roomId = body.room.id;
     slug = body.room.slug;
-    expect(slug).toMatch(/^[A-Za-z0-9]{10}$/);
+    // A room ID people can read out: three groups of four lowercase letters and digits.
+    expect(slug).toMatch(/^[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/);
     expect(body.link).toBe(`${ORIGIN}/r/${slug}`);
   });
 
