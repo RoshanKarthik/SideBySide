@@ -10,4 +10,6 @@ export interface RunRequest {
 
 export type RunnerMessage =
   | { type: 'status'; id: string; status: 'loading' | 'running' }
+  /** Output as it is printed, so a run stopped at the time limit still shows it. */
+  | { type: 'output'; id: string; stream: 'stdout' | 'stderr'; text: string }
   | { type: 'result'; id: string; output: RunOutput };

@@ -64,20 +64,40 @@ function lockdown(): void {
 const realPostMessage = self.postMessage.bind(self);
 const post = (msg: RunnerMessage) => realPostMessage(msg);
 
-/** Collects output up to the size limit. */
+/** Writes sent one by one before streaming switches to batches (so "print, then hang" shows). */
+const EAGER_WRITES = 500;
+const STREAM_BATCH_MS = 50;
+
+/**
+ * Collects output up to the size limit, and streams it to the page as it is written: a run that
+ * hits the time limit is killed with the worker, and this is how its output survives.
+ */
 class OutputBuffer {
   private chunks: string[] = [];
   private size = 0;
+  private pending = '';
+  private writes = 0;
+  private lastSent = 0;
   truncated = false;
+  constructor(
+    private readonly runId: string,
+    private readonly stream: 'stdout' | 'stderr',
+  ) {}
   write(text: string): void {
     if (this.truncated) return;
     if (this.size + text.length > LIMITS.outputBytes) {
-      this.chunks.push(text.slice(0, LIMITS.outputBytes - this.size));
+      text = text.slice(0, LIMITS.outputBytes - this.size);
       this.truncated = true;
-      return;
     }
     this.chunks.push(text);
     this.size += text.length;
+    this.pending += text;
+    const now = performance.now();
+    if (++this.writes <= EAGER_WRITES || this.truncated || now - this.lastSent >= STREAM_BATCH_MS) {
+      post({ type: 'output', id: this.runId, stream: this.stream, text: this.pending });
+      this.pending = '';
+      this.lastSent = now;
+    }
   }
   toString(): string {
     const text = this.chunks.join('');
@@ -104,8 +124,8 @@ async function runPython(req: RunRequest): Promise<RunOutput> {
   lockdown();
   post({ type: 'status', id: req.id, status: 'running' });
 
-  const stdout = new OutputBuffer();
-  const stderr = new OutputBuffer();
+  const stdout = new OutputBuffer(req.id, 'stdout');
+  const stderr = new OutputBuffer(req.id, 'stderr');
   const decoder = new TextDecoder();
   // Byte-level reads: Pyodide's string-returning `stdin` handler truncates large inputs.
   const input = new TextEncoder().encode(req.stdin);
@@ -206,8 +226,8 @@ async function runJavaScript(req: RunRequest): Promise<RunOutput> {
   lockdown();
   post({ type: 'status', id: req.id, status: 'running' });
 
-  const stdout = new OutputBuffer();
-  const stderr = new OutputBuffer();
+  const stdout = new OutputBuffer(req.id, 'stdout');
+  const stderr = new OutputBuffer(req.id, 'stderr');
   const lines = req.stdin.split(/\r?\n/);
   if (lines.at(-1) === '') lines.pop();
   let cursor = 0;

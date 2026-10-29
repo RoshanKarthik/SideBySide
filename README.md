@@ -341,7 +341,6 @@ each step. The tests are not part of `pnpm test`.
 ## Known limitations
 
 - Only Python, JavaScript and TypeScript can be run; Java, C++, C and Go can be edited but not run.
-- Output printed before a program hits the 10-second time limit is not shown.
 - Code runs are reported by the browser that ran them, so a participant could fake their own
   run's output. Tests run in an interviewer's browser (which already holds the hidden tests), so
   **Run tests** needs an interviewer in the room.

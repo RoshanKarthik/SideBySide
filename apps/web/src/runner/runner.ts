@@ -61,6 +61,8 @@ export class CodeRunner {
     const worker = this.worker;
 
     return new Promise<RunOutput>((resolve) => {
+      // What the program printed so far, for a run stopped at the time limit.
+      const partial = { stdout: '', stderr: '' };
       let timer = setTimeout(
         () => finish(result('timeout', 'Timed out while loading the runtime.'), true),
         LOAD_TIMEOUT_MS,
@@ -77,17 +79,21 @@ export class CodeRunner {
       const onMessage = (event: MessageEvent<RunnerMessage>) => {
         const msg = event.data;
         if (msg.id !== req.id) return;
-        if (msg.type === 'status') {
+        if (msg.type === 'output') {
+          partial[msg.stream] += msg.text;
+        } else if (msg.type === 'status') {
           onPhase?.(msg.status);
           if (msg.status === 'running') {
             clearTimeout(timer);
             timer = setTimeout(() => {
+              const notice = `Time limit exceeded (${LIMITS.runTimeoutMs / 1000}s). The program was stopped.`;
+              const stderr = partial.stderr
+                ? partial.stderr.replace(/\n?$/, '\n') + notice
+                : notice;
               finish(
                 {
-                  ...result(
-                    'timeout',
-                    `Time limit exceeded (${LIMITS.runTimeoutMs / 1000}s). The program was stopped.`,
-                  ),
+                  ...result('timeout', stderr),
+                  stdout: partial.stdout,
                   timeMs: LIMITS.runTimeoutMs,
                 },
                 true,
