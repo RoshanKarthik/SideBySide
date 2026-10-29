@@ -1,13 +1,13 @@
-import type { CallPresence, RtcSignal } from '@sidebyside/shared';
+import type { CallPresence, IceServer, RtcSignal } from '@sidebyside/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RoomConnection } from '@/room/use-room';
 import type { LocalMedia } from './local-media';
 
 /**
- * Public STUN servers let two browsers find a direct route to each other. A few strict
- * networks also need a TURN relay; one can be added here when the app is deployed.
+ * Public STUN servers let two browsers find a direct route to each other; used until the room's
+ * own list (which adds a TURN relay for strict networks, when the server has one) arrives.
  */
-const ICE_SERVERS: RTCIceServer[] = [
+const STUN_ONLY: RTCIceServer[] = [
   { urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] },
 ];
 /** An offer that got no answer in this long is sent again on a fresh connection. */
@@ -70,7 +70,11 @@ function attachTracks(pc: RTCPeerConnection, media: MediaStream) {
  * peer connection. Signalling goes through the room's socket; audio and video go directly
  * between browsers. Fine for an interview (2–4 people).
  */
-export function useCall(conn: RoomConnection | null, media: LocalMedia): CallState {
+export function useCall(
+  conn: RoomConnection | null,
+  media: LocalMedia,
+  iceServers?: IceServer[],
+): CallState {
   // A new id on every join, so leaving and rejoining looks like a new peer to the others.
   const [callId, setCallId] = useState(newCallId);
   const [joined, setJoined] = useState(false);
@@ -93,9 +97,11 @@ export function useCall(conn: RoomConnection | null, media: LocalMedia): CallSta
   }, []);
   const mediaRef = useRef(media);
   const connRef = useRef(conn);
+  const iceRef = useRef<RTCIceServer[]>(STUN_ONLY);
   useEffect(() => {
     mediaRef.current = media;
     connRef.current = conn;
+    if (iceServers?.length) iceRef.current = iceServers;
   });
 
   const signal = useCallback(
@@ -123,7 +129,7 @@ export function useCall(conn: RoomConnection | null, media: LocalMedia): CallSta
   const createLink = useCallback(
     (remoteId: string): PeerLink => {
       const offerer = callId < remoteId;
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = new RTCPeerConnection({ iceServers: iceRef.current });
       const link: PeerLink = {
         pc,
         offerer,

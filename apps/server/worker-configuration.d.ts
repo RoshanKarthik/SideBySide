@@ -8,6 +8,8 @@ interface __BaseEnv_Env {
   AI_SUMMARY_PROVIDER: string;
   AI_MODEL: string;
   REMOTE_EXECUTION: string;
+  TURN_KEY_ID: string;
+  TURN_KEY_API_TOKEN: string;
   BETTER_AUTH_SECRET: string;
   GUEST_TOKEN_SECRET: string;
   GOOGLE_CLIENT_ID: string;
@@ -38,6 +40,8 @@ declare namespace NodeJS {
       | 'AI_SUMMARY_PROVIDER'
       | 'AI_MODEL'
       | 'REMOTE_EXECUTION'
+      | 'TURN_KEY_ID'
+      | 'TURN_KEY_API_TOKEN'
       | 'BETTER_AUTH_SECRET'
       | 'GUEST_TOKEN_SECRET'
       | 'GOOGLE_CLIENT_ID'

@@ -264,3 +264,13 @@ export const executeRequestSchema = z.object({
   stdin: z.string().max(LIMITS.stdinBytes, 'The input is too long'),
 });
 export type ExecuteRequest = z.infer<typeof executeRequestSchema>;
+
+/** Servers a video call uses to connect: STUN, plus a TURN relay when the server has one. */
+export interface IceServer {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+export interface IceServersResponse {
+  iceServers: IceServer[];
+}

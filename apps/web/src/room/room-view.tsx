@@ -1,5 +1,10 @@
-import { isInterviewerRole, type JoinRoomResponse, type PresenceState } from '@sidebyside/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  isInterviewerRole,
+  type IceServersResponse,
+  type JoinRoomResponse,
+  type PresenceState,
+} from '@sidebyside/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
   Check,
@@ -70,7 +75,14 @@ export function RoomView({
 }) {
   const { room, participant, brand } = membership;
   const conn = useRoom(room, participant, slug);
-  const call = useCall(conn, media);
+  // STUN, plus short-lived TURN credentials when the server has a relay (see ice-servers.ts).
+  const ice = useQuery({
+    queryKey: ['ice-servers', room.id],
+    queryFn: () => api.json<IceServersResponse>(`/rooms/${room.id}/ice-servers`, { roomKey: slug }),
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: 1,
+  });
+  const call = useCall(conn, media, ice.data?.iceServers);
   const [autoJoined, setAutoJoined] = useState(false);
   if (startInCall && !autoJoined && conn) {
     setAutoJoined(true);

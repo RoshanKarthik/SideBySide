@@ -64,7 +64,7 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 | API            | Hono + zod                                                                  |
 | Web            | React 19, Vite, React Router, TanStack Query, Tailwind CSS 4, Radix UI      |
 | UI             | Geist + Instrument Serif (self-hosted), cmdk palette, sonner toasts         |
-| Video call     | WebRTC mesh between browsers, signalled through the room's Durable Object   |
+| Video call     | WebRTC mesh signalled through the room; Cloudflare TURN relay when set up   |
 | Editors        | Monaco + `y-monaco` (code), TipTap + Yjs (notes)                            |
 | Whiteboard     | Excalidraw, synced through the room's Yjs document                          |
 | Code execution | Pyodide and a JS/TS runner in a Web Worker; Wandbox for Java, C, C++, Go    |
@@ -290,6 +290,12 @@ each step. The tests are not part of `pnpm test`.
    Then set `AI_SUMMARY_PROVIDER` to `"workers-ai"` in `wrangler.jsonc`. Leave it `"off"` to
    hide the feature. (`"sample"` shows fixed sample reports and is for local development only.)
 
+   **TURN relay for calls (optional, recommended).** In the Cloudflare dashboard, open
+   Realtime → TURN Server and create a TURN key (1,000 GB a month free), then from
+   `apps/server` run `npx wrangler secret put TURN_KEY_ID` and
+   `npx wrangler secret put TURN_KEY_API_TOKEN`. The room hands browsers short-lived
+   credentials; the key never leaves the server.
+
 6. **App URL.** The `deploy` script in `apps/server/package.json` passes the production URL
    (`https://sidebyside.roshankarrthik.workers.dev`) as `PUBLIC_APP_URL`; `wrangler.jsonc` keeps
    the local one. Change it there if the address changes. Keep `ALLOW_DEV_LOGIN` set to
@@ -355,9 +361,8 @@ each step. The tests are not part of `pnpm test`.
 - Code runs are reported by the browser that ran them, so a participant could fake their own
   run's output. Tests run in an interviewer's browser (which already holds the hidden tests), so
   **Run tests** needs an interviewer in the room.
-- Video calls use public STUN servers only. Most networks connect directly, but some strict
-  corporate networks need a TURN relay (for example Cloudflare's), which isn't set up yet. Calls
-  are a mesh, so they suit interviews of two to four people, not large meetings.
+- Calls are a mesh, so they suit interviews of two to four people, not large meetings. Without
+  a TURN key (see Deploying), strict networks that block direct routes can't connect calls.
 - AI reports use the Workers AI free allocation (about 10,000 neurons a day, roughly a dozen
   sessions' reports). Beyond that, reports fail with a quota message until the next day and can
   be regenerated then.

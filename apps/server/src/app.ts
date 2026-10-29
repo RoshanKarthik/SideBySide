@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { boardFileRoutes } from './api/board-files';
 import { claimRoutes } from './api/claim';
 import { executeRoutes } from './api/execute';
+import { iceServerRoutes } from './api/ice-servers';
 import { meRoutes } from './api/me';
 import { practiceRoutes } from './api/practice';
 import { questionRoutes } from './api/questions';
@@ -70,6 +71,7 @@ export function createApp(deps: AppDeps) {
   app.route('/', practiceRoutes(deps));
   app.route('/', boardFileRoutes(deps));
   app.route('/', executeRoutes(deps));
+  app.route('/', iceServerRoutes());
   app.route('/', claimRoutes());
   app.route('/', reportRoutes(deps));
 
