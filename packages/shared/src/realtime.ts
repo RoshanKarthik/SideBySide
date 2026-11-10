@@ -132,6 +132,14 @@ export interface PresenceState {
   call?: CallPresence | null;
   /** Whiteboard pointer in scene coordinates, while on the Design tab. */
   pointer?: BoardPointer | null;
+  /** What this person is working on on the whiteboard, so others see their name on it. */
+  boardFocus?: BoardFocus | null;
+}
+
+export interface BoardFocus {
+  /** The text box being typed in, or the selected elements. */
+  ids: string[];
+  typing: boolean;
 }
 
 export interface CallPresence {

@@ -11,6 +11,7 @@ import type { RemoteExcalidrawElement } from '@excalidraw/excalidraw/data/reconc
 import type { ExcalidrawElementSkeleton } from '@excalidraw/excalidraw/data/transform';
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type {
+  AppState,
   BinaryFileData,
   BinaryFiles,
   Collaborator,
@@ -18,7 +19,7 @@ import type {
   ExcalidrawInitialDataState,
   SocketId,
 } from '@excalidraw/excalidraw/types';
-import type { BoardPointer, PresenceState } from '@sidebyside/shared';
+import type { BoardFocus, BoardPointer, PresenceState } from '@sidebyside/shared';
 import { getBoard } from '@sidebyside/shared/doc';
 import { LayoutTemplate, Lock } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
@@ -142,11 +143,25 @@ export default function DesignBoard({
   }, [board]);
   useEffect(() => flush, [flush]);
   const pointerDown = useRef(false);
+  // What we're typing in or have selected → awareness, so others see our name on it.
+  const lastFocus = useRef('null');
+  const publishFocus = (appState: AppState) => {
+    const editing = appState.editingTextElement;
+    const ids = editing
+      ? [editing.id]
+      : Object.keys(appState.selectedElementIds).filter((id) => appState.selectedElementIds[id]);
+    const focus: BoardFocus | null = ids.length ? { ids, typing: !!editing } : null;
+    const signature = JSON.stringify(focus);
+    if (signature === lastFocus.current) return;
+    lastFocus.current = signature;
+    provider.awareness.setLocalStateField('boardFocus', focus);
+  };
   const onSceneChange = (
     elements: readonly OrderedExcalidrawElement[],
-    _appState: unknown,
+    appState: AppState,
     files: BinaryFiles,
   ) => {
+    publishFocus(appState);
     if (readOnlyRef.current) return;
     uploadNewFiles(elements, files);
     pending.current = elements;
@@ -182,9 +197,18 @@ export default function DesignBoard({
     provider.awareness.setLocalStateField('pointer', value);
   };
   useEffect(() => {
-    if (!active) provider.awareness.setLocalStateField('pointer', null);
+    if (active) return;
+    provider.awareness.setLocalStateField('pointer', null);
+    provider.awareness.setLocalStateField('boardFocus', null);
+    lastFocus.current = 'null';
   }, [active, provider]);
-  useEffect(() => () => provider.awareness.setLocalStateField('pointer', null), [provider]);
+  useEffect(
+    () => () => {
+      provider.awareness.setLocalStateField('pointer', null);
+      provider.awareness.setLocalStateField('boardFocus', null);
+    },
+    [provider],
+  );
 
   // Other people's pointers on the board.
   useEffect(() => {
@@ -260,7 +284,118 @@ export default function DesignBoard({
             <MainMenu.DefaultItems.ChangeCanvasBackground />
           </MainMenu>
         </Excalidraw>
+        {api && <NameTags api={api} conn={conn} />}
       </div>
+    </div>
+  );
+}
+
+interface NameTag {
+  key: string;
+  name: string;
+  hue: number;
+  typing: boolean;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Space between an element and the outline drawn around it, in screen pixels. */
+const TAG_PADDING = 4;
+
+/**
+ * The hue Excalidraw gives someone's pointer. It picks its own from their id and ignores the
+ * colour we pass, so name tags use the same rule to match the pointer next to them.
+ */
+function pointerHue(participantId: string): number {
+  let hash = 0;
+  for (let i = 0; i < participantId.length; i++) {
+    hash = (hash << 5) - hash + participantId.charCodeAt(i);
+  }
+  return (Math.abs(hash) % 37) * 10;
+}
+
+/**
+ * Other people's names on what they're working on: an outline in their colour around the text
+ * box they're typing in or the elements they've selected, with their name above it. Follows
+ * the board as it scrolls and zooms.
+ */
+function NameTags({ api, conn }: { api: ExcalidrawImperativeAPI; conn: RoomConnection }) {
+  const { doc, provider } = conn;
+  const [tags, setTags] = useState<NameTag[]>([]);
+  useEffect(() => {
+    let last = '';
+    const update = () => {
+      const focused: { clientId: number; state: PresenceState; focus: BoardFocus }[] = [];
+      provider.awareness.getStates().forEach((raw, clientId) => {
+        const state = raw as Partial<PresenceState>;
+        if (clientId === doc.clientID || !state.user || state.tab !== 'design') return;
+        if (state.boardFocus) {
+          focused.push({ clientId, state: state as PresenceState, focus: state.boardFocus });
+        }
+      });
+      const next: NameTag[] = [];
+      if (focused.length) {
+        const { scrollX, scrollY, zoom } = api.getAppState();
+        const byId = new Map(api.getSceneElementsIncludingDeleted().map((el) => [el.id, el]));
+        for (const { clientId, state, focus } of focused) {
+          // A text box someone has only just started is still empty, and marked deleted.
+          const elements = focus.ids
+            .map((id) => byId.get(id))
+            .filter((el) => el && (focus.typing || !el.isDeleted)) as OrderedExcalidrawElement[];
+          if (!elements.length) continue;
+          const [x1, y1, x2, y2] = getCommonBounds(elements);
+          next.push({
+            key: String(clientId),
+            name: state.user.name,
+            hue: pointerHue(state.user.participantId),
+            typing: focus.typing,
+            left: Math.round((x1 + scrollX) * zoom.value) - TAG_PADDING,
+            top: Math.round((y1 + scrollY) * zoom.value) - TAG_PADDING,
+            width: Math.round((x2 - x1) * zoom.value) + 2 * TAG_PADDING,
+            height: Math.round((y2 - y1) * zoom.value) + 2 * TAG_PADDING,
+          });
+        }
+      }
+      const signature = JSON.stringify(next);
+      if (signature === last) return;
+      last = signature;
+      setTags(next);
+    };
+    // Board changes (including scrolling and zooming) and other people's focus both move tags.
+    const unsubscribe = api.onChange(update);
+    provider.awareness.on('change', update);
+    update();
+    return () => {
+      unsubscribe();
+      provider.awareness.off('change', update);
+    };
+  }, [api, doc, provider]);
+
+  return (
+    // Above Excalidraw's canvases (z-index 1–2), below its toolbars (4).
+    <div className="pointer-events-none absolute inset-0 z-[3] overflow-hidden" aria-hidden>
+      {tags.map((tag) => (
+        <div
+          key={tag.key}
+          className="absolute rounded-sm border-[1.5px]"
+          style={{
+            left: tag.left,
+            top: tag.top,
+            width: tag.width,
+            height: tag.height,
+            borderColor: `hsl(${tag.hue}, 70%, 45%)`,
+          }}
+        >
+          <span
+            className="absolute bottom-full left-[-1.5px] mb-1 rounded px-1.5 py-0.5 text-[11px] leading-none font-semibold whitespace-nowrap text-[#1b1b1f]"
+            style={{ background: `hsl(${tag.hue}, 100%, 83%)` }}
+          >
+            {tag.typing ? `${tag.name} · typing` : tag.name}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
