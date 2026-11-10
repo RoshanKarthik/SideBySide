@@ -51,7 +51,7 @@ test('Video call: interviewer and candidate see and hear each other', async ({ b
   });
 
   await test.step('leaving the call keeps the room open', async () => {
-    await candidate.page.getByRole('button', { name: 'Leave' }).click();
+    await candidate.page.getByRole('button', { name: 'Leave call' }).click();
     await expect(callPanel(candidate.page)).toHaveCount(0);
     await expect(candidate.page.getByRole('button', { name: 'Join call' })).toBeVisible();
     await expect(callPanel(interviewer.page)).toContainText('Call · 1 person');

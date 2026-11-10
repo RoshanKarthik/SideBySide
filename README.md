@@ -9,7 +9,8 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
 
 - Interviewers sign in (Google, GitHub or a link sent to their email) and create a room.
 - Candidates open the link, or type its room ID (like `kxmp-7rtw-q4hn`) on the Join a room page,
-  enter their name, accept the recording notice and join. No account.
+  enter their name, accept the recording notice and join. No account. Leaving the room, closing
+  the tab or reopening the link means joining again (the notice included), into the same seat.
 - A lobby checks camera and microphone (with device pickers and a level meter) before anyone
   enters. In the room, a peer-to-peer video call floats over the corner with camera, mute,
   device settings and leave controls; calls are never recorded.
@@ -18,7 +19,8 @@ sharing. Every edit is recorded with a server timestamp, so the whole session ca
   Java, C, C++ and Go compile and run on Wandbox (wandbox.org, a free public compiler service)
   through the Worker.
   HTML/CSS/JS renders in a live, sandboxed preview with its console output.
-- A shared whiteboard (Design tab) with live pointers, starter templates and images.
+- A shared whiteboard (Design tab) with live pointers, starter templates and images. Whatever
+  someone is typing in or has selected carries their name for everyone else.
 - Interviewers keep a question bank (their own questions plus a public practice bank) with
   starter code, hints and test cases. **Show to candidate** loads the problem and starter code;
   **Run tests** reports pass/fail and a score out of 100 weighted by each test's weight, and

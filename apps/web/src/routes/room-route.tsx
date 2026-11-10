@@ -29,7 +29,7 @@ import { Checkbox, Field, Input, Label } from '@/components/ui/form';
 import { Avatar } from '@/components/ui/overlay';
 import { ApiRequestError, api } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
-import { setGuestToken } from '@/lib/guest-tokens';
+import { forgetJoinedHere, hasJoinedHere, markJoinedHere, setGuestToken } from '@/lib/guest-tokens';
 import { useMe } from '@/lib/use-me';
 import { RoomView } from '@/room/room-view';
 
@@ -45,6 +45,22 @@ export default function RoomRoute() {
     queryKey: ['room-public', slug],
     queryFn: () => api.json<PublicRoom>(`/rooms/${slug}/public`),
   });
+  // Candidates join through the join screen on each visit (see guest-tokens.ts). Read per room;
+  // the counter re-renders after joining or leaving.
+  const [, setVisits] = useState(0);
+  const [leftSlug, setLeftSlug] = useState<string | null>(null);
+  const joined = hasJoinedHere(slug);
+  const left = leftSlug === slug;
+  const onJoined = () => {
+    markJoinedHere(slug);
+    setLeftSlug(null);
+    setVisits((n) => n + 1);
+  };
+  const onLeave = () => {
+    forgetJoinedHere(slug);
+    setLeftSlug(slug);
+    setVisits((n) => n + 1);
+  };
   const membership = useQuery({
     queryKey: ['room-me', slug],
     queryFn: async () => {
@@ -77,16 +93,46 @@ export default function RoomRoute() {
     if (room.status === 'ended') return <EndedNotice room={room} />;
     return <CoInterviewerInvite slug={slug} token={invite} room={room} />;
   }
-  if (membership.data) return <EnterRoom slug={slug} membership={membership.data} />;
+  if (membership.data) {
+    const { participant, room: joinedRoom } = membership.data;
+    // Interview candidates only: in practice rooms the partner solving a round is a
+    // "candidate" too, but they were matched in and come and go with the session.
+    const candidate = participant.role === 'candidate' && joinedRoom.mode === 'interview';
+    if (!candidate || joinedRoom.status === 'ended' || joined) {
+      return (
+        <EnterRoom
+          slug={slug}
+          membership={membership.data}
+          onLeave={candidate ? onLeave : undefined}
+        />
+      );
+    }
+    return (
+      <JoinForm
+        slug={slug}
+        room={room}
+        rejoin={{ name: participant.displayName, left }}
+        onJoined={onJoined}
+      />
+    );
+  }
   if (room.status === 'ended') return <EndedNotice room={room} />;
-  return <JoinForm slug={slug} room={room} />;
+  return <JoinForm slug={slug} room={room} onJoined={onJoined} />;
 }
 
 /**
  * The lobby (camera and microphone check), then the room. The camera and microphone live
  * here so the room keeps them when a practice round swaps and the room reopens.
  */
-function EnterRoom({ slug, membership }: { slug: string; membership: JoinRoomResponse }) {
+function EnterRoom({
+  slug,
+  membership,
+  onLeave,
+}: {
+  slug: string;
+  membership: JoinRoomResponse;
+  onLeave?: () => void;
+}) {
   const me = useMe();
   const lowBandwidth = me.data?.lowBandwidth ?? false;
   const media = useLocalMedia({ lowBandwidth });
@@ -120,6 +166,7 @@ function EnterRoom({ slug, membership }: { slug: string; membership: JoinRoomRes
       membership={membership}
       media={media}
       startInCall={entered.withCall}
+      onLeave={onLeave}
     />
   );
 }
@@ -258,7 +305,18 @@ function CoInterviewerInvite({
   );
 }
 
-function JoinForm({ slug, room }: { slug: string; room: PublicRoom }) {
+function JoinForm({
+  slug,
+  room,
+  rejoin,
+  onJoined,
+}: {
+  slug: string;
+  room: PublicRoom;
+  /** Someone who already has a seat here, joining again: their name stays as it was. */
+  rejoin?: { name: string; left: boolean };
+  onJoined: () => void;
+}) {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [consent, setConsent] = useState(false);
@@ -271,6 +329,7 @@ function JoinForm({ slug, room }: { slug: string; room: PublicRoom }) {
       }),
     onSuccess: (res) => {
       if (res.collabToken) setGuestToken(slug, res.collabToken);
+      onJoined();
       queryClient.setQueryData(['room-me', slug], res);
     },
   });
@@ -292,17 +351,27 @@ function JoinForm({ slug, room }: { slug: string; room: PublicRoom }) {
         {room.brand?.companyName ? ` from ${room.brand.companyName}` : ''} invited you to
       </p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight text-balance">{room.title}</h1>
+      {rejoin?.left && (
+        <p role="status" className="mt-4 rounded-lg border bg-muted/50 px-3 py-2 text-sm">
+          You left the room. Join again to go back in.
+        </p>
+      )}
       <form onSubmit={submit} className="mt-8 space-y-5">
-        <Field label="Your name" htmlFor="name" hint="Shown to everyone in the room.">
+        <Field
+          label="Your name"
+          htmlFor="name"
+          hint={rejoin ? 'You keep the name you joined with.' : 'Shown to everyone in the room.'}
+        >
           <Input
             id="name"
             name="name"
-            required={!session}
+            required={!session && !rejoin}
+            readOnly={!!rejoin}
             maxLength={60}
             autoComplete="name"
-            defaultValue={session?.user.name ?? ''}
+            defaultValue={rejoin?.name ?? session?.user.name ?? ''}
             placeholder="Asha Rao"
-            autoFocus
+            autoFocus={!rejoin}
           />
         </Field>
         <div className="rounded-xl border bg-card p-4 text-sm shadow-card">
@@ -335,7 +404,7 @@ function JoinForm({ slug, room }: { slug: string; room: PublicRoom }) {
           {!join.isPending && <ArrowRight />}
         </Button>
       </form>
-      {!session && (
+      {!session && !rejoin && (
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Interviewer?{' '}
           <Link

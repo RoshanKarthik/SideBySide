@@ -21,6 +21,42 @@ export function setGuestToken(roomKey: string, token: string): void {
 }
 
 /**
+ * Candidates go through the join screen (the recording notice) on every visit, as in any
+ * meeting app: leaving, closing the tab or reopening the link means joining again, though into
+ * the same seat. A reload keeps them in, so this tab remembers that they joined. Kept in memory
+ * too, for browsers that block storage.
+ */
+const ENTERED_KEY = (roomKey: string) => `sbs-entered:${roomKey}`;
+const enteredHere = new Set<string>();
+
+export function hasJoinedHere(roomKey: string): boolean {
+  if (enteredHere.has(roomKey)) return true;
+  try {
+    return sessionStorage.getItem(ENTERED_KEY(roomKey)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markJoinedHere(roomKey: string): void {
+  enteredHere.add(roomKey);
+  try {
+    sessionStorage.setItem(ENTERED_KEY(roomKey), '1');
+  } catch {
+    // Storage blocked: remembered until the page reloads.
+  }
+}
+
+export function forgetJoinedHere(roomKey: string): void {
+  enteredHere.delete(roomKey);
+  try {
+    sessionStorage.removeItem(ENTERED_KEY(roomKey));
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+/**
  * A guest's claim token for an ended session, kept in this browser (not the URL) while they
  * sign up or sign in, so the link can't leak through history or a provider redirect.
  */

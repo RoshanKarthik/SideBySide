@@ -161,7 +161,7 @@ export function CallControls({ call, media }: { call: CallState; media: LocalMed
           media.release();
         }}
       >
-        <PhoneOff /> Leave
+        <PhoneOff /> Leave call
       </Button>
     </div>
   );

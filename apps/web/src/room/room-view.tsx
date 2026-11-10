@@ -12,6 +12,7 @@ import {
   Code2,
   Link2,
   Lock,
+  LogOut,
   NotebookPen,
   PanelRight,
   PenTool,
@@ -68,11 +69,14 @@ export function RoomView({
   membership,
   media,
   startInCall = false,
+  onLeave,
 }: {
   slug: string;
   membership: JoinRoomResponse;
   media: LocalMedia;
   startInCall?: boolean;
+  /** Candidates leave the room this way; coming back means joining again. */
+  onLeave?: () => void;
 }) {
   const { room, participant, brand } = membership;
   const conn = useRoom(room, participant, slug);
@@ -197,6 +201,19 @@ export function RoomView({
         <PresenceAvatars peers={conn.peers} selfClientId={conn.doc.clientID} />
         <span className="hidden h-6 w-px bg-border sm:block" aria-hidden />
         <CallControls call={call} media={media} />
+        {onLeave && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              call.leave();
+              media.release();
+              onLeave();
+            }}
+          >
+            <LogOut /> Leave room
+          </Button>
+        )}
         {interviewer && !practice && <CopyRoomId slug={slug} />}
         {interviewer && !practice && <CopyCandidateLink slug={slug} />}
         {interviewer && <EndSessionButton pending={end.isPending} onConfirm={() => end.mutate()} />}
